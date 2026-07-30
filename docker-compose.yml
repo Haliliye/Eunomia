@@ -1,0 +1,64 @@
+# Dev-oriented one-command startup: runs Mongo, the backend (via the .NET SDK
+# image + `dotnet run`), and the frontend (via the Node image + `npm run dev`)
+# with live source mounts, so it behaves like the local Windows/VS workflow
+# but from a single `docker compose up`. NOT a production deployment setup —
+# see the "Production containerization" note in the README's DevOps section.
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+
+  backend:
+    image: mcr.microsoft.com/dotnet/sdk:8.0
+    working_dir: /src
+    volumes:
+      - ./backend:/src
+    ports:
+      - "5000:5000"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://0.0.0.0:5000
+      MongoDb__ConnectionString: mongodb://mongo:27017
+      MongoDb__DatabaseName: todoapp
+      # Required — compose refuses to start without it (see .env.example).
+      Jwt__SecretKey: ${JWT_SECRET_KEY:?Set JWT_SECRET_KEY in a .env file — see .env.example}
+      Jwt__Issuer: TodoApp
+      Jwt__Audience: TodoAppClient
+      Jwt__ExpiryMinutes: "15"
+      Jwt__RefreshTokenExpiryDays: "30"
+      # Optional — leave all blank (the default) and the app falls back to
+      # showing verification/reset links directly in the API response instead
+      # of emailing them. Fill these in to send real emails; see .env.example.
+      Smtp__Host: ${SMTP_HOST:-}
+      Smtp__Port: ${SMTP_PORT:-587}
+      Smtp__Username: ${SMTP_USERNAME:-}
+      Smtp__Password: ${SMTP_PASSWORD:-}
+      Smtp__FromEmail: ${SMTP_FROM_EMAIL:-}
+      Smtp__FromName: ${SMTP_FROM_NAME:-Eunomia}
+      Smtp__FrontendBaseUrl: http://localhost:5173
+    command: sh -c "dotnet restore && dotnet run --project src/TodoApp.Api --no-launch-profile"
+    depends_on:
+      - mongo
+
+  frontend:
+    image: node:20-alpine
+    working_dir: /app
+    volumes:
+      - ./frontend:/app
+      # Anonymous volume so the container's own node_modules (built for
+      # Linux) isn't shadowed by a host node_modules built for Windows/macOS.
+      - /app/node_modules
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_API_BASE_URL: http://localhost:5000/api
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    depends_on:
+      - backend
+
+volumes:
+  mongo-data:

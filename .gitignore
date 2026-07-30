@@ -1,0 +1,26 @@
+# Backend
+backend/**/bin/
+backend/**/obj/
+*.user
+.vs/
+logs/
+backend/**/TestResults/
+*.trx
+backend/**/App_Data/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+frontend/.env.local
+frontend/test-results/
+frontend/playwright-report/
+
+# Docker Compose secrets — copy .env.example to .env and never commit the real one
+.env
+
+# IDE
+.idea/
+
+# OS
+.DS_Store

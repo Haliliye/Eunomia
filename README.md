@@ -220,19 +220,13 @@ takım adı + story id'sinden türetiliyor.
 
 Bilinçli olarak kapsam dışı bırakılanlar:
 
-- **E-posta gönderimi yok** — davet ve şifre sıfırlama bildirimleri uygulama içi
-  (in-app) kalıyor; gerçek bir SMTP/SendGrid entegrasyonu (`IEmailSender` soyutlaması)
-  eklenmedi.
-- **E-posta doğrulama yok** — kayıt olan her hesap anında aktif.
-- **Sprint bazlı ayrı bir board/dashboard görünümü yok** — Board/Dashboard hâlâ takımın
-  tüm story'lerini gösteriyor, sprint'e göre filtrelenmiyor.
-- **Token'lar `localStorage`'da** — XSS'e karşı `httpOnly` cookie kadar güvenli değil.
-- **Production containerization** — mevcut Docker Compose sadece geliştirme içindir;
-  gerçek dağıtım için multi-stage `Dockerfile`, non-root kullanıcı, TLS sonlandırma,
-  MongoDB auth/yedekleme stratejisi gerekir.
-- **Controller/HTTP seviyesinde uçtan uca testler** (`WebApplicationFactory`) yok.
-- Modal'larda tam bir focus-trap yok; kapsamlı bir erişilebilirlik denetimi
-  (axe/Lighthouse) yapılmadı.
+- **Production Docker imajı non-root kullanıcı ile çalışmıyor** — `backend/Dockerfile`
+  artık gerçek bir multi-stage build (Render gibi platformlarda kullanılıyor), ama
+  container'ın kendisi hâlâ varsayılan (root) kullanıcıyla çalışıyor. TLS sonlandırma
+  ve MongoDB'nin auth/yedekleme stratejisi de barındırma platformuna (Render, Atlas
+  vb.) bırakılıyor, bu repo'nun kapsamında değil.
+- Modal'larda focus-trap var (`useFocusTrap`) ama kapsamlı, otomatik bir erişilebilirlik
+  denetimi (axe/Lighthouse) hâlâ yapılmadı — el ile yapılan bir gözden geçirmeydi.
 
 ---
 

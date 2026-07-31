@@ -362,20 +362,55 @@ tamamlandı (US-119 → US-124):
   oluşuyor — aynı başlık/açıklama/atanan, bir sonraki teslim tarihi frekansa göre
   hesaplanıyor (Daily/Weekly/Monthly). End date geçmişse yeni occurrence oluşturulmuyor.
   Recurring story'ler her yerde 🔁 ikonuyla işaretleniyor.
-- **US-134/135/136 (File Attachments):** `IAttachmentStorage` soyutlaması —
-  implementasyonu (`LocalDiskAttachmentStorage`) dosyaları **yerel diskte**
-  (`AttachmentStorage:RootPath`, varsayılan `App_Data/attachments`) saklıyor, sadece
-  metadata (dosya adı, boyut, tip, yükleyen, tarih) Mongo'da. 10MB boyut limiti ve bir
-  dosya tipi allowlist'i (görseller + yaygın belgeler — çalıştırılabilir dosyalar hariç)
-  hem client hem server tarafında kontrol ediliyor. Görsel/PDF dosyalar tarayıcıda inline
-  açılıyor, diğerleri indiriliyor.
-  - **Önemli bir sınır — üretime taşırken dikkat:** Yerel disk depolama tek bir API
-    instance'ı için çalışır; birden fazla instance (load balancer arkasında) veya
-    container yeniden oluşturulduğunda (mount edilen bir volume yoksa) dosyalar
-    kaybolur/erişilemez olur. Gerçek bir dağıtım için `IAttachmentStorage`'ın S3/Azure
-    Blob gibi bir implementasyonuyla değiştirilmesi gerekir — Application/Domain
-    katmanlarına hiç dokunulmadan, sadece Infrastructure'da yeni bir sınıf yazılarak.
-  - `App_Data/` klasörü `.gitignore`'a eklendi — yüklenen dosyalar repo'ya gitmiyor.
+- **US-134/135/136 (File Attachments):** `IAttachmentStorage` soyutlaması — iki
+  implementasyonu var, `AttachmentStorage:RootPath`'e göre değil, `R2Storage:Enabled`'a
+  göre seçiliyor:
+  - **`LocalDiskAttachmentStorage`** (varsayılan) — dosyaları yerel diskte saklıyor
+    (`AttachmentStorage:RootPath`, varsayılan `App_Data/attachments`). Sadece metadata
+    (dosya adı, boyut, tip, yükleyen, tarih) Mongo'da.
+  - **`R2AttachmentStorage`** — `R2Storage:Enabled=true` olduğunda devreye giriyor,
+    Cloudflare R2'ye (S3 uyumlu API, AWS SDK ile) yazıyor. Bu, tek bir kod satırına
+    dokunmadan Application/Domain katmanlarını hiç etkilemeden yapılan bir değişim —
+    tam da `IAttachmentStorage` soyutlamasının amacı buydu.
+  - **Neden gerekliydi:** Yerel disk depolama tek bir API instance'ı için çalışır;
+    birden fazla instance (load balancer arkasında) veya container yeniden
+    oluşturulduğunda (mount edilen bir volume yoksa — **Render'ın ücretsiz katmanı
+    dahil**) dosyalar kaybolur. R2, ücretsiz katmanında 10GB'a kadar depolama +
+    egress ücreti almıyor (S3'ün aksine), bu yüzden ücretsiz bir dağıtım için
+    doğal bir seçim.
+  - 10MB boyut limiti ve bir dosya tipi allowlist'i (görseller + yaygın belgeler —
+    çalıştırılabilir dosyalar hariç) hem client hem server tarafında kontrol ediliyor.
+    Görsel/PDF dosyalar tarayıcıda inline açılıyor, diğerleri indiriliyor.
+  - `App_Data/` klasörü `.gitignore`'a eklendi — yerel disk kullanılırken bile
+    yüklenen dosyalar repo'ya gitmiyor.
+
+  **R2'yi ayarlamak için:**
+  1. [Cloudflare dashboard](https://dash.cloudflare.com)'da **R2 Object Storage**'a git,
+     bir bucket oluştur (örn. `eunomia-attachments`)
+  2. **Manage R2 API Tokens** → yeni bir API token oluştur (bu bucket için okuma+yazma
+     yetkili), **Access Key ID** ve **Secret Access Key**'i kopyala
+  3. Bucket'ın "S3 API" adresini kopyala — `https://<account-id>.r2.cloudflarestorage.com`
+     formatında
+  4. Docker Compose kullanıyorsan `.env` dosyana ekle:
+     ```
+     R2_ENABLED=true
+     R2_SERVICE_URL=https://<account-id>.r2.cloudflarestorage.com
+     R2_ACCESS_KEY_ID=<access-key-id>
+     R2_SECRET_ACCESS_KEY=<secret-access-key>
+     R2_BUCKET_NAME=eunomia-attachments
+     ```
+     Visual Studio'dan çalıştırıyorsan (Docker yerine) aynı değerleri `dotnet user-secrets`
+     ile ayarla (`backend/src/TodoApp.Api` klasöründen):
+     ```
+     dotnet user-secrets set "R2Storage:Enabled" "true"
+     dotnet user-secrets set "R2Storage:ServiceUrl" "https://<account-id>.r2.cloudflarestorage.com"
+     dotnet user-secrets set "R2Storage:AccessKeyId" "<access-key-id>"
+     dotnet user-secrets set "R2Storage:SecretAccessKey" "<secret-access-key>"
+     dotnet user-secrets set "R2Storage:BucketName" "eunomia-attachments"
+     ```
+  5. `R2Storage:Enabled` false ya da bu bölüm hiç ayarlanmamışsa, hiçbir şey
+     kırılmıyor — otomatik olarak yerel diske düşüyor (yerel geliştirme için hâlâ
+     sıfır-konfigürasyon).
 
 ## Phase 2 — Sprint 10 (Activity & Audit Log + Time Tracking)
 

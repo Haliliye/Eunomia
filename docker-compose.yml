@@ -40,6 +40,11 @@ services:
       Smtp__FromEmail: ${SMTP_FROM_EMAIL:-}
       Smtp__FromName: ${SMTP_FROM_NAME:-Eunomia}
       Smtp__FrontendBaseUrl: http://localhost:5173
+      R2Storage__Enabled: ${R2_ENABLED:-false}
+      R2Storage__ServiceUrl: ${R2_SERVICE_URL:-}
+      R2Storage__AccessKeyId: ${R2_ACCESS_KEY_ID:-}
+      R2Storage__SecretAccessKey: ${R2_SECRET_ACCESS_KEY:-}
+      R2Storage__BucketName: ${R2_BUCKET_NAME:-}
     command: sh -c "dotnet restore && dotnet run --project src/TodoApp.Api --no-launch-profile"
     depends_on:
       - mongo

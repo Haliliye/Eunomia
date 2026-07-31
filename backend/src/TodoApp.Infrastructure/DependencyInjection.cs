@@ -27,6 +27,7 @@ public static class DependencyInjection
         services.Configure<JwtSettings>(configuration.GetSection(JwtSettings.SectionName));
         services.Configure<SmtpSettings>(configuration.GetSection(SmtpSettings.SectionName));
         services.Configure<AttachmentStorageSettings>(configuration.GetSection(AttachmentStorageSettings.SectionName));
+        services.Configure<R2StorageSettings>(configuration.GetSection(R2StorageSettings.SectionName));
         services.AddSingleton<MongoDbContext>();
 
         services.AddScoped<ITeamRepository, TeamRepository>();
@@ -46,7 +47,27 @@ public static class DependencyInjection
         services.AddSingleton<IJwtTokenGenerator, JwtTokenGenerator>();
         services.AddScoped<IEmailSender, SmtpEmailSender>();
         services.AddScoped<IEmailSettingsProvider, EmailSettingsProvider>();
-        services.AddSingleton<IAttachmentStorage, LocalDiskAttachmentStorage>();
+        // R2Storage:Enabled=true swaps in the Cloudflare R2-backed implementation
+        // (needed for any deployment whose filesystem doesn't persist between
+        // restarts/redeploys — e.g. Render's free tier); local disk remains the
+        // zero-config default for local development.
+        var r2Settings = configuration.GetSection(R2StorageSettings.SectionName).Get<R2StorageSettings>();
+        if (r2Settings?.Enabled == true)
+        {
+            services.AddSingleton<Amazon.S3.IAmazonS3>(_ => new Amazon.S3.AmazonS3Client(
+                r2Settings.AccessKeyId,
+                r2Settings.SecretAccessKey,
+                new Amazon.S3.AmazonS3Config
+                {
+                    ServiceURL = r2Settings.ServiceUrl,
+                    ForcePathStyle = true, // required by R2's S3-compatible API
+                }));
+            services.AddSingleton<IAttachmentStorage, R2AttachmentStorage>();
+        }
+        else
+        {
+            services.AddSingleton<IAttachmentStorage, LocalDiskAttachmentStorage>();
+        }
 
         return services;
     }

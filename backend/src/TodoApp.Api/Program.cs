@@ -149,11 +149,23 @@ builder.Services.AddSwaggerGen(options =>
     });
 });
 
+// Comma-separated additional origins (e.g. the production frontend URL) can
+// be supplied via Cors:AdditionalOrigins / CORS__ADDITIONALORIGINS — keeps
+// the Vercel/Netlify URL out of source, settable per-environment instead.
+var additionalCorsOrigins = builder.Configuration["Cors:AdditionalOrigins"]
+    ?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+    ?? Array.Empty<string>();
+
+var corsOrigins = new[] { "http://localhost:5173", "https://eunomia-seven.vercel.app" }
+    .Concat(additionalCorsOrigins)
+    .Distinct()
+    .ToArray();
+
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
     {
-        policy.WithOrigins("http://localhost:5173") // Vite dev server
+        policy.WithOrigins(corsOrigins)
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials(); // SignalR's negotiate/websocket handshake needs this

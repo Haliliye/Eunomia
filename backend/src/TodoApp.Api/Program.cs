@@ -203,7 +203,12 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 app.MapHub<AppHub>("/hubs/app");
-app.MapHealthChecks("/health");
+// AllowAnonymous is required here — the global FallbackPolicy above makes
+// every endpoint require a JWT by default, but health checks are polled by
+// infrastructure (Render's own health probe, uptime monitors, load
+// balancers) that has no way to authenticate. Without this, /health itself
+// returns 401, which most platforms then treat as "service unhealthy."
+app.MapHealthChecks("/health").AllowAnonymous();
 
 app.Run();
 

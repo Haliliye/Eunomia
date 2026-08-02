@@ -61,6 +61,7 @@ public static class DependencyInjection
                 {
                     ServiceURL = r2Settings.ServiceUrl,
                     ForcePathStyle = true, // required by R2's S3-compatible API
+                    AuthenticationRegion = "auto", // Cloudflare's documented value for R2 — without an explicit region, SigV4 signing can mismatch what R2 expects
                 }));
             services.AddSingleton<IAttachmentStorage, R2AttachmentStorage>();
         }

@@ -1,6 +1,5 @@
 using Amazon.S3;
 using Amazon.S3.Model;
-using Amazon.S3.Transfer;
 using Microsoft.Extensions.Options;
 using TodoApp.Application.Common;
 
@@ -33,11 +32,20 @@ public class R2AttachmentStorage : IAttachmentStorage
     {
         var storageKey = Guid.NewGuid().ToString("N");
 
-        // TransferUtility handles both small uploads and (if content is large
-        // enough) multipart automatically — no need to know the stream's
-        // length upfront, which a plain PutObjectRequest generally does.
-        using var transferUtility = new TransferUtility(_s3Client);
-        await transferUtility.UploadAsync(content, _bucketName, storageKey, cancellationToken);
+        // A plain PutObjectRequest, not TransferUtility — TransferUtility
+        // uploads using AWS's "streaming SigV4" (chunked payload signing),
+        // which R2 doesn't implement at all ("STREAMING-AWS4-HMAC-SHA256-PAYLOAD
+        // not implemented", confirmed as a known R2 limitation by Cloudflare's
+        // own community). DisablePayloadSigning switches to the simpler
+        // unsigned-payload variant R2 does support.
+        await _s3Client.PutObjectAsync(new PutObjectRequest
+        {
+            BucketName = _bucketName,
+            Key = storageKey,
+            InputStream = content,
+            AutoCloseStream = false, // the caller (AddAttachmentCommandHandler) owns the stream's lifetime
+            DisablePayloadSigning = true,
+        }, cancellationToken);
 
         return storageKey;
     }

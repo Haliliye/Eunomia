@@ -34,4 +34,17 @@ COPY --from=build /app .
 ENV ASPNETCORE_HTTP_PORTS=8080
 EXPOSE 8080
 
+# Forces .NET's file-change-detection machinery (used by config reload,
+# among other things) to poll instead of using native inotify. The inotify
+# instance limit (usually 128) is scoped per-UID on the underlying HOST
+# kernel, not per-container — on shared hosting like Render's free tier,
+# many redeploys over time can accumulate watchers against that shared
+# limit until even an unrelated request fails with "configured user limit
+# (128) on the number of inotify instances has been reached". This is a
+# long-documented .NET-on-Linux-containers issue (see
+# github.com/dotnet/aspnetcore/issues/7531 and #8449) — polling avoids it
+# entirely, at the cost of slightly slower change detection we don't need
+# anyway (nothing in this app relies on live config-file reloading).
+ENV DOTNET_USE_POLLING_FILE_WATCHER=true
+
 ENTRYPOINT ["dotnet", "TodoApp.Api.dll"]

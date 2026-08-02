@@ -20,6 +20,29 @@ Log.Logger = new LoggerConfiguration().WriteTo.Console().CreateBootstrapLogger()
 
 var builder = WebApplication.CreateBuilder(args);
 
+// WebApplication.CreateBuilder wires up appsettings.json with
+// reloadOnChange: true by default, which starts a FileSystemWatcher
+// (inotify on Linux). That's known to segfault (exit code 139) in some
+// restricted container environments — Render's free tier included — and
+// we don't need it anyway: every real setting here comes from environment
+// variables (Docker Compose / Render's dashboard), not a JSON file that
+// changes while the container is running. Re-adding the same JSON files
+// with reloadOnChange: false avoids starting the watcher at all.
+builder.Configuration.Sources.Clear();
+builder.Configuration
+    .AddJsonFile("appsettings.json", optional: true, reloadOnChange: false)
+    .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", optional: true, reloadOnChange: false)
+    .AddEnvironmentVariables()
+    .AddCommandLine(args);
+
+// CreateBuilder normally adds this automatically for Development — restoring
+// it since Sources.Clear() above wiped it out too. Local dev (Visual Studio)
+// relies on `dotnet user-secrets set ...` for Jwt/Smtp/R2Storage values.
+if (builder.Environment.IsDevelopment())
+{
+    builder.Configuration.AddUserSecrets<Program>(optional: true);
+}
+
 // Structured logging (Serilog) instead of the default provider — console for
 // local dev, plus a rolling file so history survives past the terminal
 // scrolling away. Swap/add sinks (Seq, Application Insights, etc.) here for

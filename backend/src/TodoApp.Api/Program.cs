@@ -43,6 +43,18 @@ if (builder.Environment.IsDevelopment())
     builder.Configuration.AddUserSecrets<Program>(optional: true);
 }
 
+// Render (and most hosting platforms) assign a port dynamically and expect
+// the app to bind to it via the PORT environment variable — our Dockerfile's
+// static ASPNETCORE_HTTP_PORTS=8080 only matters when PORT isn't set (e.g.
+// Docker Compose locally). Explicitly binding to 0.0.0.0 (not localhost) is
+// what actually matters here — Render's own port scanner only looks on
+// 0.0.0.0, and Kestrel defaults to localhost-only otherwise.
+var platformPort = Environment.GetEnvironmentVariable("PORT");
+if (!string.IsNullOrEmpty(platformPort))
+{
+    builder.WebHost.UseUrls($"http://0.0.0.0:{platformPort}");
+}
+
 // Structured logging (Serilog) instead of the default provider — console for
 // local dev, plus a rolling file so history survives past the terminal
 // scrolling away. Swap/add sinks (Seq, Application Insights, etc.) here for

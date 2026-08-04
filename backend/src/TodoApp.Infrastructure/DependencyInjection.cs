@@ -26,6 +26,7 @@ public static class DependencyInjection
         services.Configure<MongoDbSettings>(configuration.GetSection(MongoDbSettings.SectionName));
         services.Configure<JwtSettings>(configuration.GetSection(JwtSettings.SectionName));
         services.Configure<SmtpSettings>(configuration.GetSection(SmtpSettings.SectionName));
+        services.Configure<BrevoApiSettings>(configuration.GetSection(BrevoApiSettings.SectionName));
         services.Configure<AttachmentStorageSettings>(configuration.GetSection(AttachmentStorageSettings.SectionName));
         services.Configure<R2StorageSettings>(configuration.GetSection(R2StorageSettings.SectionName));
         services.AddSingleton<MongoDbContext>();
@@ -45,8 +46,21 @@ public static class DependencyInjection
 
         services.AddSingleton<IPasswordHasher, PasswordHasher>();
         services.AddSingleton<IJwtTokenGenerator, JwtTokenGenerator>();
-        services.AddScoped<IEmailSender, SmtpEmailSender>();
-        services.AddScoped<IEmailSettingsProvider, EmailSettingsProvider>();
+        // BrevoApi:ApiKey configured wins over SMTP — Render's free tier blocks
+        // outbound traffic to SMTP ports (25/465/587) entirely, but ordinary
+        // HTTPS to Brevo's REST API isn't affected. SMTP stays as the
+        // zero-extra-setup path for local dev / any host that doesn't block it.
+        var brevoSettings = configuration.GetSection(BrevoApiSettings.SectionName).Get<BrevoApiSettings>();
+        if (brevoSettings?.IsConfigured == true)
+        {
+            services.AddHttpClient<IEmailSender, BrevoApiEmailSender>();
+            services.AddScoped<IEmailSettingsProvider, BrevoEmailSettingsProvider>();
+        }
+        else
+        {
+            services.AddScoped<IEmailSender, SmtpEmailSender>();
+            services.AddScoped<IEmailSettingsProvider, EmailSettingsProvider>();
+        }
         // R2Storage:Enabled=true swaps in the Cloudflare R2-backed implementation
         // (needed for any deployment whose filesystem doesn't persist between
         // restarts/redeploys — e.g. Render's free tier); local disk remains the

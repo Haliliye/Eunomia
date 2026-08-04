@@ -539,3 +539,31 @@ atanmamış geliyor, elle atama yapman gerekiyor.
   desende, bu turda hiçbir yeni boşluk bulunmadı — ama her yeni sorgu eklerken
   üyelik kontrolünü unutmama alışkanlığı korundu (`AddStoryLink`, `GlobalSearch`,
   `GetTeamVelocity`, `BulkCreate` hepsinde var).
+
+## E-posta gönderimi — SMTP yerine Brevo HTTP API
+
+Render'ın ücretsiz katmanı, kötüye kullanımı önlemek için **giden SMTP bağlantılarını
+(25/465/587 portları) tamamen engelliyor** (Eylül 2025'ten beri) — bu yüzden SMTP
+ayarları doğru olsa bile Render'da e-posta gönderilemiyordu (bağlantı sessizce
+askıda kalıyor, hata bile vermiyor).
+
+Çözüm: `IEmailSender` soyutlamasının yanına bir de **Brevo'nun HTTP API'si**
+üzerinden gönderim yapan bir implementasyon (`BrevoApiEmailSender`) eklendi — bu,
+normal HTTPS (443 portu) kullanıyor, hiçbir platformda engellenmiyor. Hangisinin
+kullanılacağı otomatik seçiliyor:
+
+- `BrevoApi:ApiKey` doluysa → Brevo API kullanılıyor (Render için önerilen)
+- Boşsa → eski SMTP yoluna düşülüyor (SMTP portlarını engellemeyen ortamlar için,
+  örn. yerel geliştirme)
+
+**Not:** Bu, SMTP key'inden **farklı** bir anahtar — Brevo dashboard'da
+**Settings → SMTP & API → API Keys** sekmesinden alınıyor, `Smtp:Password`'de
+kullanılan SMTP key'le karıştırılmamalı.
+
+**Ayrıca düzeltilen bir şey:** E-posta gönderimindeki hatalar daha önce
+(`RegisterCommandHandler`, `RequestPasswordResetCommandHandler`,
+`ResendEmailVerificationCommandHandler`'da) tamamen sessizce yutuluyordu — hiç
+loglanmıyordu. Bu, gerçek bir SMTP/API hatasını "hiçbir şey olmuyor" durumundan
+ayırt etmeyi imkansız kılıyordu. Üçüne de `ILogger` eklenip artık gerçek hata
+mesajı loglanıyor (kullanıcıya hâlâ sessizce davranılıyor — hesap varlığını
+sızdırmamak için — ama artık en azından loglardan görülebiliyor).

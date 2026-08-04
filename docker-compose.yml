@@ -40,6 +40,10 @@ services:
       Smtp__FromEmail: ${SMTP_FROM_EMAIL:-}
       Smtp__FromName: ${SMTP_FROM_NAME:-Eunomia}
       Smtp__FrontendBaseUrl: http://localhost:5173
+      BrevoApi__ApiKey: ${BREVO_API_KEY:-}
+      BrevoApi__FromEmail: ${BREVO_FROM_EMAIL:-}
+      BrevoApi__FromName: ${BREVO_FROM_NAME:-Eunomia}
+      BrevoApi__FrontendBaseUrl: http://localhost:5173
       R2Storage__Enabled: ${R2_ENABLED:-false}
       R2Storage__ServiceUrl: ${R2_SERVICE_URL:-}
       R2Storage__AccessKeyId: ${R2_ACCESS_KEY_ID:-}

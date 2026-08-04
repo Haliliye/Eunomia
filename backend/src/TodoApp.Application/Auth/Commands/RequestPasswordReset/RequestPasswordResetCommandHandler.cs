@@ -1,5 +1,6 @@
 using MediatR;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using TodoApp.Application.Common;
 using TodoApp.Domain.Auth;
 using TodoApp.Domain.Users;
@@ -15,19 +16,22 @@ public class RequestPasswordResetCommandHandler : IRequestHandler<RequestPasswor
     private readonly IEmailSender _emailSender;
     private readonly IEmailSettingsProvider _emailSettings;
     private readonly IHostEnvironment _environment;
+    private readonly ILogger<RequestPasswordResetCommandHandler> _logger;
 
     public RequestPasswordResetCommandHandler(
         IUserRepository userRepository,
         IPasswordResetTokenRepository resetTokenRepository,
         IEmailSender emailSender,
         IEmailSettingsProvider emailSettings,
-        IHostEnvironment environment)
+        IHostEnvironment environment,
+        ILogger<RequestPasswordResetCommandHandler> logger)
     {
         _userRepository = userRepository;
         _resetTokenRepository = resetTokenRepository;
         _emailSender = emailSender;
         _emailSettings = emailSettings;
         _environment = environment;
+        _logger = logger;
     }
 
     public async Task<string?> Handle(RequestPasswordResetCommand request, CancellationToken cancellationToken)
@@ -53,11 +57,12 @@ public class RequestPasswordResetCommandHandler : IRequestHandler<RequestPasswor
             {
                 await _emailSender.SendAsync(user.Email, "Reset your password", EmailTemplates.ResetPassword(resetLink), cancellationToken);
             }
-            catch
+            catch (Exception ex)
             {
-                // Swallowed deliberately — same reasoning as RegisterCommandHandler:
-                // don't let a mail-server hiccup surface as an error here, since
-                // that would also leak "this email exists" information.
+                // Still swallowed from the caller's perspective — don't let a
+                // mail-server hiccup surface as an error here, since that would
+                // also leak "this email exists" information. Logged now, though.
+                _logger.LogError(ex, "Failed to send password reset email to {Email}", user.Email);
             }
             return null;
         }

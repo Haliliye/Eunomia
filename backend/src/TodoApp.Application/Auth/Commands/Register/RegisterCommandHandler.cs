@@ -1,5 +1,6 @@
 using MediatR;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using TodoApp.Application.Auth.DTOs;
 using TodoApp.Application.Common;
 using TodoApp.Domain.Auth;
@@ -19,6 +20,7 @@ public class RegisterCommandHandler : IRequestHandler<RegisterCommand, AuthResul
     private readonly IEmailSender _emailSender;
     private readonly IEmailSettingsProvider _emailSettings;
     private readonly IHostEnvironment _environment;
+    private readonly ILogger<RegisterCommandHandler> _logger;
 
     public RegisterCommandHandler(
         IUserRepository userRepository,
@@ -28,7 +30,8 @@ public class RegisterCommandHandler : IRequestHandler<RegisterCommand, AuthResul
         IEmailVerificationTokenRepository verificationTokenRepository,
         IEmailSender emailSender,
         IEmailSettingsProvider emailSettings,
-        IHostEnvironment environment)
+        IHostEnvironment environment,
+        ILogger<RegisterCommandHandler> logger)
     {
         _userRepository = userRepository;
         _passwordHasher = passwordHasher;
@@ -38,6 +41,7 @@ public class RegisterCommandHandler : IRequestHandler<RegisterCommand, AuthResul
         _emailSender = emailSender;
         _emailSettings = emailSettings;
         _environment = environment;
+        _logger = logger;
     }
 
     public async Task<AuthResultDto> Handle(RegisterCommand request, CancellationToken cancellationToken)
@@ -79,10 +83,11 @@ public class RegisterCommandHandler : IRequestHandler<RegisterCommand, AuthResul
             {
                 await _emailSender.SendAsync(user.Email, "Verify your email", EmailTemplates.VerifyEmail(verificationLink), cancellationToken);
             }
-            catch
+            catch (Exception ex)
             {
-                // Swallowed deliberately — see comment above. A real deployment
-                // would log this (Serilog is already wired up app-wide).
+                // Still swallowed from the caller's perspective (registration
+                // itself already succeeded), but logged now.
+                _logger.LogError(ex, "Failed to send verification email to {Email}", user.Email);
             }
         }
         else if (_environment.IsDevelopment())

@@ -22,15 +22,18 @@ public class JiraApiClient : IJiraClient
     private const string AuthBaseUrl = "https://auth.atlassian.com";
     private const string ApiBaseUrl = "https://api.atlassian.com";
 
-    // NOTE: offline_access is deliberately NOT requested — including it makes
-    // Atlassian reject the authorize request outright with a generic
-    // "failed to retrieve client" error for this app (root cause not fully
-    // identified; confirmed reproducible by isolating this scope alone).
-    // Consequence: no refresh token is issued, so the access token (~1hr
-    // lifetime) can't be silently renewed — JiraAccessTokenProvider surfaces
-    // a clear "reconnect" error once it expires instead of a confusing
-    // refresh failure.
-    private const string Scopes = "read:jira-work read:jira-user";
+    // offline_access is what makes Atlassian issue a refresh token at all —
+    // without it, the access token can't be renewed and the user would have
+    // to re-authorize every hour.
+    //
+    // NOTE: during initial testing this app intermittently returned
+    // "failed to retrieve client" regardless of scope — the exact same
+    // authorize URL succeeded once and failed on retries with identical
+    // parameters, pointing to a transient issue on Atlassian's side (likely
+    // propagation delay for a freshly created OAuth app) rather than
+    // anything wrong with this request. If it recurs, retry rather than
+    // assume the scope/params are at fault.
+    private const string Scopes = "read:jira-work read:jira-user offline_access";
 
     private readonly HttpClient _httpClient;
     private readonly JiraSettings _settings;

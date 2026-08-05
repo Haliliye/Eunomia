@@ -49,12 +49,25 @@ public class AesTokenCipher : ITokenCipher
         Buffer.BlockCopy(tag, 0, combined, NonceSize, TagSize);
         Buffer.BlockCopy(cipherBytes, 0, combined, NonceSize + TagSize, cipherBytes.Length);
 
-        return Convert.ToBase64String(combined);
+        // URL-safe base64 (RFC 4648 §5): state travels through a redirect
+        // chain we don't control (our redirect_uri -> Atlassian -> back to
+        // us), so avoid the standard alphabet's '+', '/', '=' entirely
+        // rather than trust every hop to preserve them byte-for-byte.
+        return ToBase64Url(combined);
+    }
+
+    private static string ToBase64Url(byte[] bytes) =>
+        Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+
+    private static byte[] FromBase64Url(string base64Url)
+    {
+        var base64 = base64Url.Replace('-', '+').Replace('_', '/');
+        return Convert.FromBase64String(base64.PadRight(base64.Length + (4 - base64.Length % 4) % 4, '='));
     }
 
     public string Decrypt(string cipherText)
     {
-        var combined = Convert.FromBase64String(cipherText);
+        var combined = FromBase64Url(cipherText);
         var nonce = combined[..NonceSize];
         var tag = combined[NonceSize..(NonceSize + TagSize)];
         var cipherBytes = combined[(NonceSize + TagSize)..];

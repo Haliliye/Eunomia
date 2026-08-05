@@ -11,8 +11,10 @@ using TodoApp.Domain.Sprints;
 using TodoApp.Domain.Teams;
 using TodoApp.Domain.UserStories;
 using TodoApp.Domain.Users;
+using TodoApp.Domain.Integrations;
 using TodoApp.Infrastructure.Attachments;
 using TodoApp.Infrastructure.Email;
+using TodoApp.Infrastructure.Integrations.Jira;
 using TodoApp.Infrastructure.Persistence;
 using TodoApp.Infrastructure.Persistence.Repositories;
 using TodoApp.Infrastructure.Security;
@@ -29,6 +31,8 @@ public static class DependencyInjection
         services.Configure<BrevoApiSettings>(configuration.GetSection(BrevoApiSettings.SectionName));
         services.Configure<AttachmentStorageSettings>(configuration.GetSection(AttachmentStorageSettings.SectionName));
         services.Configure<R2StorageSettings>(configuration.GetSection(R2StorageSettings.SectionName));
+        services.Configure<JiraSettings>(configuration.GetSection(JiraSettings.SectionName));
+        services.Configure<TokenEncryptionSettings>(configuration.GetSection(TokenEncryptionSettings.SectionName));
         services.AddSingleton<MongoDbContext>();
 
         services.AddScoped<ITeamRepository, TeamRepository>();
@@ -43,6 +47,7 @@ public static class DependencyInjection
         services.AddScoped<IActivityRepository, ActivityRepository>();
         services.AddScoped<ISprintRepository, SprintRepository>();
         services.AddScoped<IPersonalTaskRepository, PersonalTaskRepository>();
+        services.AddScoped<IJiraConnectionRepository, JiraConnectionRepository>();
 
         services.AddSingleton<IPasswordHasher, PasswordHasher>();
         services.AddSingleton<IJwtTokenGenerator, JwtTokenGenerator>();
@@ -82,6 +87,18 @@ public static class DependencyInjection
         else
         {
             services.AddSingleton<IAttachmentStorage, LocalDiskAttachmentStorage>();
+        }
+
+        services.AddSingleton<ITokenCipher, AesTokenCipher>();
+
+        // Only registered when a Jira OAuth app is actually configured — the
+        // Jira endpoints simply aren't usable (clear DI error rather than a
+        // silent no-op) until Jira:ClientId/ClientSecret are set, same as
+        // Brevo above.
+        var jiraSettings = configuration.GetSection(JiraSettings.SectionName).Get<JiraSettings>();
+        if (jiraSettings?.IsConfigured == true)
+        {
+            services.AddHttpClient<IJiraClient, JiraApiClient>();
         }
 
         return services;

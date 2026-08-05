@@ -14,9 +14,17 @@ namespace TodoApp.Application.UserStories.Commands.ImportUserStories;
 /// </summary>
 internal static class ImportRowParser
 {
-    public static List<ImportRowDto> ParseAndValidate(string csvContent, CsvColumnMapping mapping)
+    public static List<ImportRowDto> ParseAndValidate(string csvContent, CsvColumnMapping mapping) =>
+        ParseAndValidate(CsvParser.Parse(csvContent), mapping);
+
+    /// <summary>
+    /// Same validation/mapping as the CSV-text overload, but takes already-tabular
+    /// rows directly — lets a non-CSV source (e.g. Jira's REST API, see
+    /// ImportFromJiraCommandHandler) build an in-memory header+data grid and
+    /// reuse this exact logic instead of round-tripping through CSV text.
+    /// </summary>
+    public static List<ImportRowDto> ParseAndValidate(IReadOnlyList<string[]> rows, CsvColumnMapping mapping)
     {
-        var rows = CsvParser.Parse(csvContent);
         var results = new List<ImportRowDto>();
         if (rows.Count == 0) return results;
 

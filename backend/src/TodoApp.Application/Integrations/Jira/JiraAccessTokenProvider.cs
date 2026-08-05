@@ -31,6 +31,12 @@ public class JiraAccessTokenProvider
         if (!connection.AccessTokenNeedsRefresh)
             return (connection, _tokenCipher.Decrypt(connection.AccessTokenEncrypted));
 
+        // No refresh token was issued (offline_access isn't requested — see
+        // JiraApiClient.Scopes) so an expired access token can't be silently
+        // renewed; the user has to go through Connect Jira again.
+        if (string.IsNullOrEmpty(connection.RefreshTokenEncrypted))
+            throw new InvalidOperationException("Your Jira connection has expired. Please reconnect Jira.");
+
         var refreshToken = _tokenCipher.Decrypt(connection.RefreshTokenEncrypted);
         var tokenResult = await _jiraClient.RefreshTokenAsync(refreshToken, cancellationToken);
 

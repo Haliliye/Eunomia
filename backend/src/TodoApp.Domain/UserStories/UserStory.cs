@@ -197,25 +197,10 @@ public class UserStory : AggregateRoot
 
     public void ChangeStatus(UserStoryStatus newStatus)
     {
-        // Workflow: ToDo -> Analyze -> Dev -> Test -> Done, with Test able to
-        // send work to Debug, and Debug feeding back into Dev or Test. Each
-        // stage can also step back one, mirroring how work actually moves
-        // (a failed test goes to Debug, not straight back to ToDo).
-        var allowedTransitions = new Dictionary<UserStoryStatus, UserStoryStatus[]>
-        {
-            [UserStoryStatus.ToDo] = new[] { UserStoryStatus.Analyze },
-            [UserStoryStatus.Analyze] = new[] { UserStoryStatus.ToDo, UserStoryStatus.Dev },
-            [UserStoryStatus.Dev] = new[] { UserStoryStatus.Analyze, UserStoryStatus.Test },
-            [UserStoryStatus.Test] = new[] { UserStoryStatus.Dev, UserStoryStatus.Debug, UserStoryStatus.Done },
-            [UserStoryStatus.Debug] = new[] { UserStoryStatus.Dev, UserStoryStatus.Test },
-            [UserStoryStatus.Done] = new[] { UserStoryStatus.Test },
-        };
-
-        if (Status == newStatus) return;
-
-        if (!allowedTransitions[Status].Contains(newStatus))
-            throw new InvalidOperationException($"Cannot transition from {Status} to {newStatus}.");
-
+        // Previously restricted to a fixed adjacency graph (ToDo -> Analyze
+        // -> Dev -> Test -> Done, with Debug branching off Test); relaxed to
+        // allow any-to-any so a board card can be dragged straight to any
+        // column instead of only the "next" one in the old workflow graph.
         Status = newStatus;
     }
 

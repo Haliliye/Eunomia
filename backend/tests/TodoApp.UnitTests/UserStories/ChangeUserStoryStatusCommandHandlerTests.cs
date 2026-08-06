@@ -45,10 +45,11 @@ public class ChangeUserStoryStatusCommandHandlerTests
     }
 
     [Fact]
-    public async Task Handle_WithIllegalTransition_ThrowsInvalidOperationException()
+    public async Task Handle_WithNonAdjacentTransition_Succeeds()
     {
-        // Arrange — the board's workflow disallows ToDo -> Done directly;
-        // work has to pass through Analyze -> Dev -> Test first.
+        // Arrange — status changes are no longer restricted to a fixed
+        // adjacency graph; a board card can be dragged straight from ToDo to
+        // Done (see UserStory.ChangeStatus).
         var story = UserStory.Create(Guid.NewGuid().ToString(), TeamId, "Some story", null);
         var repositoryMock = new Mock<IUserStoryRepository>();
         repositoryMock.Setup(r => r.GetByIdAsync(story.Id, It.IsAny<CancellationToken>())).ReturnsAsync(story);
@@ -59,9 +60,12 @@ public class ChangeUserStoryStatusCommandHandlerTests
         var handler = new ChangeUserStoryStatusCommandHandler(repositoryMock.Object, MakeTeamRepositoryMock().Object, realtimeMock.Object, activityMock.Object, mediatorMock.Object);
         var command = new ChangeUserStoryStatusCommand(story.Id, "Done", MemberUserId);
 
-        // Act & Assert
-        await Assert.ThrowsAsync<InvalidOperationException>(() => handler.Handle(command, CancellationToken.None));
-        repositoryMock.Verify(r => r.UpdateAsync(It.IsAny<UserStory>(), It.IsAny<CancellationToken>()), Times.Never);
+        // Act
+        await handler.Handle(command, CancellationToken.None);
+
+        // Assert
+        Assert.Equal(UserStoryStatus.Done, story.Status);
+        repositoryMock.Verify(r => r.UpdateAsync(story, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]

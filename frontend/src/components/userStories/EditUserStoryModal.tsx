@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import type { UserStory } from '@/types/userStory'
 import type { TeamMember, Label } from '@/types/team'
 import { userStoriesApi } from '@/api/userStories'
@@ -67,10 +68,17 @@ export default function EditUserStoryModal({ story, members, labels, userNames, 
         aria-modal="true"
         aria-labelledby="edit-story-title"
         onClick={(e) => e.stopPropagation()}
-        style={{ maxWidth: 560 }}
+        style={{ maxWidth: 600 }}
       >
-        <div className="modal-header">
+        <div className="modal-header" style={{ alignItems: 'center' }}>
           <h2 id="edit-story-title">Edit user story</h2>
+          <Link
+            to={`/teams/${story.teamId}/stories/${story.id}`}
+            onClick={onClose}
+            style={{ fontSize: 12.5, color: 'var(--color-brand)', textDecoration: 'none' }}
+          >
+            Open full story →
+          </Link>
         </div>
 
         <div className="field">
@@ -81,23 +89,25 @@ export default function EditUserStoryModal({ story, members, labels, userNames, 
           <label htmlFor="edit-story-description">Description (Markdown supported)</label>
           <textarea id="edit-story-description" className="textarea" value={description} onChange={(e) => setDescription(e.target.value)} maxLength={2000} />
         </div>
-        <div className="field">
-          <label htmlFor="edit-story-due-date">Due date</label>
-          <input id="edit-story-due-date" className="input" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} style={{ maxWidth: 180 }} />
-        </div>
-        <div className="field">
-          <label htmlFor="edit-story-points">Story points</label>
-          <input
-            id="edit-story-points"
-            className="input"
-            type="number"
-            min={0}
-            step={1}
-            placeholder="Not estimated"
-            value={storyPoints}
-            onChange={(e) => setStoryPoints(e.target.value)}
-            style={{ maxWidth: 120 }}
-          />
+
+        <div style={{ display: 'flex', gap: 16 }}>
+          <div className="field" style={{ flex: 1 }}>
+            <label htmlFor="edit-story-due-date">Due date</label>
+            <input id="edit-story-due-date" className="input" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+          </div>
+          <div className="field" style={{ flex: 1 }}>
+            <label htmlFor="edit-story-points">Story points</label>
+            <input
+              id="edit-story-points"
+              className="input"
+              type="number"
+              min={0}
+              step={1}
+              placeholder="Not estimated"
+              value={storyPoints}
+              onChange={(e) => setStoryPoints(e.target.value)}
+            />
+          </div>
         </div>
 
         {labels.length > 0 && (
@@ -128,8 +138,9 @@ export default function EditUserStoryModal({ story, members, labels, userNames, 
           <button className="btn btn-primary" onClick={handleSubmit}>Save changes</button>
         </div>
 
-        <hr style={{ border: 'none', borderTop: '1px solid var(--color-border)', margin: '20px 0' }} />
-        <CommentSection userStoryId={story.id} members={members} userNames={userNames} />
+        <div className="card" style={{ marginTop: 20, marginBottom: 0, background: 'var(--color-surface-sunken)' }}>
+          <CommentSection userStoryId={story.id} members={members} userNames={userNames} />
+        </div>
       </div>
     </div>
   )

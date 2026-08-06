@@ -33,6 +33,7 @@ public class UserStoryDocument
     public List<StoryLinkDocument> Links { get; set; } = new();
     public string? CreatedByUserId { get; set; }
     public string? ParentId { get; set; }
+    public string? JiraIssueKey { get; set; }
 }
 
 public class StoryLinkDocument

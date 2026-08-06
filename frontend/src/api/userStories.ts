@@ -200,6 +200,7 @@ export interface ImportSummary {
   createdCount: number
   skippedCount: number
   rows: ImportRow[]
+  updatedCount: number
 }
 
 export interface ResolvedStoryLink {

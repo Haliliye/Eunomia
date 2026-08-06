@@ -28,6 +28,7 @@ export default function JiraImportModal({ onClose }: JiraImportModalProps) {
   const [selectedTeamId, setSelectedTeamId] = useState('')
   const [preview, setPreview] = useState<ImportRow[] | null>(null)
   const [summary, setSummary] = useState<ImportSummary | null>(null)
+  const [autoSync, setAutoSync] = useState(false)
 
   useEffect(() => {
     setBusy(true)
@@ -66,7 +67,7 @@ export default function JiraImportModal({ onClose }: JiraImportModalProps) {
     if (!selectedProject || !selectedTeamId) return
     setBusy(true)
     try {
-      const result = await integrationsApi.importJiraProject(selectedProject.key, selectedTeamId)
+      const result = await integrationsApi.importJiraProject(selectedProject.key, selectedTeamId, autoSync)
       setSummary(result)
       setStep('summary')
     } catch {
@@ -122,10 +123,15 @@ export default function JiraImportModal({ onClose }: JiraImportModalProps) {
               </select>
             )}
             <p style={{ fontSize: 11.5, color: 'var(--color-ink-faint)', marginTop: 8 }}>
-              Assignees aren't imported — Jira's assignee can't be reliably matched to one of your
-              team's accounts. Story points also aren't imported (Jira stores them in a
-              site-specific custom field).
+              Issues, labels, story points, comments, attachments, sprints, and issue links come
+              along. Assignees are matched by email when they already have a Eunomia account —
+              otherwise they get an email invite to join. Re-importing later updates existing
+              stories instead of duplicating them.
             </p>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, fontSize: 12.5 }}>
+              <input type="checkbox" checked={autoSync} onChange={(e) => setAutoSync(e.target.checked)} />
+              Keep this team in sync with Jira (re-imports automatically every few hours)
+            </label>
           </>
         )}
 
@@ -165,6 +171,7 @@ export default function JiraImportModal({ onClose }: JiraImportModalProps) {
         {step === 'summary' && summary && (
           <p style={{ marginTop: 12 }}>
             <strong>{summary.createdCount}</strong> stories created.
+            {summary.updatedCount > 0 && ` ${summary.updatedCount} existing stories updated.`}
             {summary.skippedCount > 0 && ` ${summary.skippedCount} row(s) skipped.`}
           </p>
         )}

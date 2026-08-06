@@ -32,11 +32,11 @@ public class ImportUserStoriesCommandHandler : IRequestHandler<ImportUserStories
         team.EnsureIsOwnerOrAdmin(request.RequestingUserId);
 
         var rows = ImportRowParser.ParseAndValidate(request.CsvContent, request.Mapping);
-        var createdCount = await UserStoryRowApplier.ApplyAsync(team, rows, _userStoryRepository, _userRepository, request.RequestingUserId, cancellationToken);
+        var result = await UserStoryRowApplier.ApplyAsync(team, rows, _userStoryRepository, _userRepository, request.RequestingUserId, cancellationToken);
 
         await _realtimeNotifier.NotifyTeamAsync(team.Id, new { type = "storyChanged", storyId = (string?)null }, cancellationToken);
 
         var skippedCount = rows.Count(r => !r.IsValid);
-        return new ImportSummaryDto(createdCount, skippedCount, rows);
+        return new ImportSummaryDto(result.CreatedCount, skippedCount, rows, result.UpdatedCount);
     }
 }

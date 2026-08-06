@@ -214,6 +214,7 @@ builder.Services.AddHealthChecks()
 
 // US-120: periodically checks for stories due soon and reminds the assignee.
 builder.Services.AddHostedService<DueDateReminderBackgroundService>();
+builder.Services.AddHostedService<JiraAutoSyncBackgroundService>();
 
 var app = builder.Build();
 

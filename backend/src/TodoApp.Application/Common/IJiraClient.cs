@@ -25,6 +25,12 @@ public interface IJiraClient
     Task<IReadOnlyList<JiraProjectDto>> GetProjectsAsync(string accessToken, string cloudId, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<JiraIssueDto>> GetIssuesAsync(string accessToken, string cloudId, string projectKey, CancellationToken cancellationToken = default);
+
+    /// <summary>Downloads an attachment's raw bytes — url comes from JiraAttachmentDto.DownloadUrl, which is only ever a URL Jira itself gave us in an issue response (never user-supplied), so no separate host allow-list is needed here.</summary>
+    Task<Stream> DownloadAttachmentAsync(string accessToken, string downloadUrl, CancellationToken cancellationToken = default);
+
+    /// <summary>Every sprint (any state) on the Scrum board(s) attached to this project — see JiraApiClient for why a board lookup has to happen first. Empty for Kanban-only or team-managed projects with no Scrum board.</summary>
+    Task<IReadOnlyList<JiraSprintDto>> GetSprintsAsync(string accessToken, string cloudId, string projectKey, CancellationToken cancellationToken = default);
 }
 
 public record JiraTokenResult(string AccessToken, string RefreshToken, DateTime ExpiresOn);
@@ -42,4 +48,18 @@ public record JiraIssueDto(
     DateTime? DueDate,
     IReadOnlyList<string> Labels,
     string? AssigneeEmail,
-    int? StoryPoints);
+    int? StoryPoints,
+    IReadOnlyList<JiraIssueLinkDto> Links,
+    IReadOnlyList<JiraCommentDto> Comments,
+    IReadOnlyList<JiraAttachmentDto> Attachments,
+    string? SprintName);
+
+/// <summary>One side of a Jira issue link — TargetIssueKey is the *other* issue, LinkTypeRaw is Jira's own phrase for the relationship (e.g. "blocks", "is blocked by", "relates to"), mapped to our StoryLinkType in JiraIssueMapper since Jira's vocabulary is effectively unbounded (apps can add custom link types).</summary>
+public record JiraIssueLinkDto(string TargetIssueKey, string LinkTypeRaw);
+
+/// <summary>AuthorEmail follows the same "may be null due to Jira's privacy setting" rule as JiraIssueDto.AssigneeEmail — falls back to AuthorDisplayName for the imported comment's byline when it's missing.</summary>
+public record JiraCommentDto(string? AuthorEmail, string AuthorDisplayName, string BodyText, DateTime CreatedOn);
+
+public record JiraAttachmentDto(string FileName, string ContentType, long SizeBytes, string DownloadUrl);
+
+public record JiraSprintDto(string Name, DateTime? StartDate, DateTime? EndDate, string State);

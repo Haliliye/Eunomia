@@ -8,12 +8,15 @@ using TodoApp.Application.Common;
 namespace TodoApp.Infrastructure.Integrations.Jira;
 
 /// <summary>
-/// Talks to Atlassian's identity endpoints (auth.atlassian.com) and the Jira
-/// Cloud REST API (api.atlassian.com/ex/jira/{cloudId}/...) via OAuth 2.0
-/// (3LO). Uses the classic REST API v2 (not v3) specifically because v3's
-/// `description` field is Atlassian Document Format (a nested JSON rich-text
-/// tree) — v2 returns it as a plain string, which is all we need and avoids
-/// writing an ADF-to-text walker.
+/// Talks to Atlassian's identity endpoints (auth.atlassian.com), the Jira
+/// Cloud REST API (api.atlassian.com/ex/jira/{cloudId}/rest/api/2/...), and
+/// the Jira Agile REST API (.../rest/agile/1.0/...) for sprints, via OAuth
+/// 2.0 (3LO). Uses the classic REST API v2 (not v3) specifically because
+/// v3's `description` field is Atlassian Document Format (a nested JSON
+/// rich-text tree) — v2 returns it as a plain string, which is all we need
+/// and avoids writing an ADF-to-text walker. Comment bodies come back as
+/// ADF even on v2 (the comment API predates the plain-text option), so
+/// those get a minimal ADF-to-text walk — see ExtractPlainText.
 /// </summary>
 public class JiraApiClient : IJiraClient
 {
@@ -119,16 +122,16 @@ public class JiraApiClient : IJiraClient
     }
 
     /// <summary>
-    /// Story points aren't a fixed field — Jira Cloud stores them as a
-    /// per-site custom field (e.g. customfield_10016), whose id varies by
-    /// instance and whose display name varies too ("Story Points" on classic
-    /// projects, "Story point estimate" on team-managed ones). Discovered
-    /// once per import by scanning GET /rest/api/2/field for a name
-    /// containing "story point" — null if the site has no such field (e.g.
-    /// story points aren't enabled on this project), in which case it's
-    /// simply left unmapped, same as any other CSV import that skips it.
+    /// Story points and Sprint aren't fixed fields — Jira Cloud stores both
+    /// as per-site custom fields (e.g. customfield_10016), whose id varies
+    /// by instance and whose display name varies too ("Story Points" on
+    /// classic projects, "Story point estimate" on team-managed ones).
+    /// Discovered once per import by scanning GET /rest/api/2/field for a
+    /// name containing the given text — null if the site has no such field,
+    /// in which case that piece is simply left unmapped, same as any other
+    /// CSV import that skips an optional column.
     /// </summary>
-    private async Task<string?> FindStoryPointsFieldIdAsync(string accessToken, string cloudId, CancellationToken cancellationToken)
+    private async Task<string?> FindFieldIdAsync(string accessToken, string cloudId, string nameContains, CancellationToken cancellationToken)
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, $"{ApiBaseUrl}/ex/jira/{cloudId}/rest/api/2/field");
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
@@ -137,7 +140,7 @@ public class JiraApiClient : IJiraClient
         if (!response.IsSuccessStatusCode) return null; // don't fail the whole import over an optional field
 
         var fields = await response.Content.ReadFromJsonAsync<List<FieldResponse>>(JsonOptions, cancellationToken) ?? new();
-        return fields.FirstOrDefault(f => f.Name.Contains("story point", StringComparison.OrdinalIgnoreCase))?.Id;
+        return fields.FirstOrDefault(f => f.Name.Contains(nameContains, StringComparison.OrdinalIgnoreCase))?.Id;
     }
 
     public async Task<IReadOnlyList<JiraIssueDto>> GetIssuesAsync(string accessToken, string cloudId, string projectKey, CancellationToken cancellationToken = default)
@@ -147,10 +150,12 @@ public class JiraApiClient : IJiraClient
         const int pageSize = 100;
         const int maxPages = 20; // safety cap (2000 issues) — the new search/jql endpoint's pagination has been reported flaky upstream; don't loop forever on it
 
-        var storyPointsFieldId = await FindStoryPointsFieldIdAsync(accessToken, cloudId, cancellationToken);
-        var requestedFields = storyPointsFieldId is null
-            ? new[] { "summary", "description", "status", "priority", "duedate", "labels", "assignee" }
-            : new[] { "summary", "description", "status", "priority", "duedate", "labels", "assignee", storyPointsFieldId };
+        var storyPointsFieldId = await FindFieldIdAsync(accessToken, cloudId, "story point", cancellationToken);
+        var sprintFieldId = await FindFieldIdAsync(accessToken, cloudId, "sprint", cancellationToken);
+
+        var requestedFields = new List<string> { "summary", "description", "status", "priority", "duedate", "labels", "assignee", "issuelinks", "comment", "attachment" };
+        if (storyPointsFieldId is not null) requestedFields.Add(storyPointsFieldId);
+        if (sprintFieldId is not null) requestedFields.Add(sprintFieldId);
 
         for (var page = 0; page < maxPages; page++)
         {
@@ -183,14 +188,49 @@ public class JiraApiClient : IJiraClient
             {
                 int? storyPoints = null;
                 if (storyPointsFieldId is not null
-                    && issue.Fields.ExtraFields.TryGetValue(storyPointsFieldId, out var rawValue)
-                    && rawValue.ValueKind is JsonValueKind.Number)
+                    && issue.Fields.ExtraFields.TryGetValue(storyPointsFieldId, out var rawStoryPoints)
+                    && rawStoryPoints.ValueKind is JsonValueKind.Number)
                 {
                     // Jira stores this as a decimal (0.5, 1, 2, 3, 5, 8, 13...)
                     // but our domain's StoryPoints is a whole number — round
                     // rather than truncate so e.g. 0.5 doesn't disappear to 0.
-                    storyPoints = (int)Math.Round(rawValue.GetDouble(), MidpointRounding.AwayFromZero);
+                    storyPoints = (int)Math.Round(rawStoryPoints.GetDouble(), MidpointRounding.AwayFromZero);
                 }
+
+                string? sprintName = null;
+                if (sprintFieldId is not null
+                    && issue.Fields.ExtraFields.TryGetValue(sprintFieldId, out var rawSprint)
+                    && rawSprint.ValueKind is JsonValueKind.Array)
+                {
+                    // An issue can carry a history of sprints it's moved
+                    // through (backlog -> Sprint 1 -> Sprint 2, all present in
+                    // this array) — the last entry is always the current one.
+                    var last = rawSprint.EnumerateArray().LastOrDefault();
+                    if (last.ValueKind == JsonValueKind.Object && last.TryGetProperty("name", out var nameEl))
+                        sprintName = nameEl.GetString();
+                }
+
+                var links = (issue.Fields.IssueLinks ?? new())
+                    .Select(l => l.OutwardIssue is not null
+                        ? new JiraIssueLinkDto(l.OutwardIssue.Key, l.Type.Outward)
+                        : l.InwardIssue is not null
+                            ? new JiraIssueLinkDto(l.InwardIssue.Key, l.Type.Inward)
+                            : null)
+                    .Where(l => l is not null)
+                    .Cast<JiraIssueLinkDto>()
+                    .ToList();
+
+                var comments = (issue.Fields.Comment?.Comments ?? new())
+                    .Select(c => new JiraCommentDto(
+                        c.Author?.EmailAddress,
+                        c.Author?.DisplayName ?? "Unknown",
+                        ExtractPlainText(c.Body),
+                        DateTime.TryParse(c.Created, out var created) ? created : DateTime.UtcNow))
+                    .ToList();
+
+                var attachments = (issue.Fields.Attachment ?? new())
+                    .Select(a => new JiraAttachmentDto(a.Filename, a.MimeType, a.Size, a.Content))
+                    .ToList();
 
                 results.Add(new JiraIssueDto(
                     issue.Key,
@@ -201,7 +241,11 @@ public class JiraApiClient : IJiraClient
                     DateTime.TryParse(issue.Fields.DueDate, out var due) ? due : null,
                     issue.Fields.Labels ?? new List<string>(),
                     issue.Fields.Assignee?.EmailAddress,
-                    storyPoints));
+                    storyPoints,
+                    links,
+                    comments,
+                    attachments,
+                    sprintName));
             }
 
             if (string.IsNullOrEmpty(searchPage.NextPageToken) || searchPage.Issues.Count == 0) break;
@@ -209,6 +253,82 @@ public class JiraApiClient : IJiraClient
         }
 
         return results;
+    }
+
+    /// <summary>
+    /// Minimal Atlassian Document Format walker — comment bodies come back
+    /// as ADF's nested JSON tree (unlike `description`, which v2 gives us as
+    /// plain text). Only pulls out "text" nodes and joins paragraphs with
+    /// blank lines; deliberately doesn't reconstruct formatting (bold,
+    /// lists, mentions, etc.) — good enough for an imported comment's
+    /// content to be readable, not pixel-identical to Jira's rendering.
+    /// </summary>
+    private static string ExtractPlainText(JsonElement? adfNode)
+    {
+        if (adfNode is null || adfNode.Value.ValueKind != JsonValueKind.Object) return string.Empty;
+
+        var parts = new List<string>();
+        void Walk(JsonElement node)
+        {
+            if (node.ValueKind == JsonValueKind.Object)
+            {
+                if (node.TryGetProperty("type", out var typeEl) && typeEl.GetString() == "text"
+                    && node.TryGetProperty("text", out var textEl))
+                    parts.Add(textEl.GetString() ?? string.Empty);
+
+                if (node.TryGetProperty("content", out var contentEl) && contentEl.ValueKind == JsonValueKind.Array)
+                    foreach (var child in contentEl.EnumerateArray())
+                        Walk(child);
+
+                if (node.TryGetProperty("type", out var blockTypeEl) && blockTypeEl.GetString() is "paragraph" or "heading")
+                    parts.Add("\n");
+            }
+        }
+        Walk(adfNode.Value);
+
+        return string.Join(" ", parts).Replace(" \n ", "\n\n").Trim();
+    }
+
+    public async Task<Stream> DownloadAttachmentAsync(string accessToken, string downloadUrl, CancellationToken cancellationToken = default)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, downloadUrl);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadAsStreamAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<JiraSprintDto>> GetSprintsAsync(string accessToken, string cloudId, string projectKey, CancellationToken cancellationToken = default)
+    {
+        // Sprints live on a *board*, not directly on a project — a project
+        // can have zero (Kanban-only), one, or multiple boards. We fetch
+        // every board's sprints and dedupe by name, since almost every real
+        // project has exactly one Scrum board.
+        using var boardRequest = new HttpRequestMessage(HttpMethod.Get, $"{ApiBaseUrl}/ex/jira/{cloudId}/rest/agile/1.0/board?projectKeyOrId={Uri.EscapeDataString(projectKey)}");
+        boardRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        using var boardResponse = await _httpClient.SendAsync(boardRequest, cancellationToken);
+        if (!boardResponse.IsSuccessStatusCode) return new List<JiraSprintDto>(); // no Agile access / no boards — not fatal, sprints are optional
+
+        var boardPage = await boardResponse.Content.ReadFromJsonAsync<BoardPageResponse>(JsonOptions, cancellationToken);
+        var scrumBoards = (boardPage?.Values ?? new()).Where(b => b.Type == "scrum").ToList();
+
+        var sprintsByName = new Dictionary<string, JiraSprintDto>(StringComparer.OrdinalIgnoreCase);
+        foreach (var board in scrumBoards)
+        {
+            using var sprintRequest = new HttpRequestMessage(HttpMethod.Get, $"{ApiBaseUrl}/ex/jira/{cloudId}/rest/agile/1.0/board/{board.Id}/sprint?maxResults=50");
+            sprintRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+            using var sprintResponse = await _httpClient.SendAsync(sprintRequest, cancellationToken);
+            if (!sprintResponse.IsSuccessStatusCode) continue;
+
+            var sprintPage = await sprintResponse.Content.ReadFromJsonAsync<SprintPageResponse>(JsonOptions, cancellationToken);
+            foreach (var sprint in sprintPage?.Values ?? new())
+                sprintsByName[sprint.Name] = new JiraSprintDto(sprint.Name, sprint.StartDate, sprint.EndDate, sprint.State);
+        }
+
+        return sprintsByName.Values.ToList();
     }
 
     // --- Wire DTOs — deliberately kept private to this class; the rest of the app only ever sees IJiraClient's own DTOs above. ---
@@ -235,11 +355,15 @@ public class JiraApiClient : IJiraClient
         IssuePriority? Priority,
         [property: JsonPropertyName("duedate")] string? DueDate,
         List<string>? Labels,
-        IssueAssignee? Assignee)
+        IssueAssignee? Assignee,
+        [property: JsonPropertyName("issuelinks")] List<IssueLink>? IssueLinks,
+        IssueCommentField? Comment,
+        List<IssueAttachment>? Attachment)
     {
-        // Catches custom fields we asked for (like story points) but didn't
-        // give a strongly-typed property — their key (e.g. "customfield_10016")
-        // is only known at runtime, discovered via FindStoryPointsFieldIdAsync.
+        // Catches custom fields we asked for (like story points/sprint) but
+        // didn't give a strongly-typed property — their key (e.g.
+        // "customfield_10016") is only known at runtime, discovered via
+        // FindFieldIdAsync.
         [JsonExtensionData]
         public Dictionary<string, JsonElement> ExtraFields { get; init; } = new();
     }
@@ -256,4 +380,26 @@ public class JiraApiClient : IJiraClient
     private record IssueAssignee([property: JsonPropertyName("emailAddress")] string? EmailAddress);
 
     private record FieldResponse(string Id, string Name);
+
+    private record IssueLink(IssueLinkType Type, [property: JsonPropertyName("outwardIssue")] IssueLinkTarget? OutwardIssue, [property: JsonPropertyName("inwardIssue")] IssueLinkTarget? InwardIssue);
+
+    private record IssueLinkType(string Outward, string Inward);
+
+    private record IssueLinkTarget(string Key);
+
+    private record IssueCommentField(List<IssueComment> Comments);
+
+    private record IssueComment(IssueCommentAuthor? Author, JsonElement Body, string? Created);
+
+    private record IssueCommentAuthor([property: JsonPropertyName("emailAddress")] string? EmailAddress, [property: JsonPropertyName("displayName")] string? DisplayName);
+
+    private record IssueAttachment(string Filename, [property: JsonPropertyName("mimeType")] string MimeType, long Size, string Content);
+
+    private record BoardPageResponse(List<BoardResponse> Values);
+
+    private record BoardResponse(long Id, string Name, string Type);
+
+    private record SprintPageResponse(List<SprintResponse> Values);
+
+    private record SprintResponse(string Name, string State, DateTime? StartDate, DateTime? EndDate);
 }

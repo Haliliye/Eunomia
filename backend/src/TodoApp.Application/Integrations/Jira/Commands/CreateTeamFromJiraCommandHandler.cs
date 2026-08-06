@@ -47,8 +47,7 @@ public class CreateTeamFromJiraCommandHandler : IRequestHandler<CreateTeamFromJi
         await _teamRepository.AddAsync(team, cancellationToken);
         await _mediator.PublishDomainEventsAsync(team, cancellationToken);
 
-        var issues = await _jiraClient.GetIssuesAsync(accessToken, connection.CloudId, request.ProjectKey, cancellationToken);
-        var summary = await _importService.ImportAsync(team, issues, request.RequestingUserId, cancellationToken);
+        var summary = await _importService.ImportAsync(team, request.ProjectKey, accessToken, connection.CloudId, request.RequestingUserId, request.SetAutoSync, cancellationToken);
 
         return new CreateTeamFromJiraResult(TeamMapper.ToDto(team), summary);
     }

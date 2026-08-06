@@ -19,6 +19,13 @@ export interface CreateTeamFromJiraResult {
   importSummary: ImportSummary
 }
 
+export interface JiraSyncStatus {
+  isLinked: boolean
+  projectKey?: string
+  autoSyncEnabled: boolean
+  lastSyncedOn?: string
+}
+
 export const integrationsApi = {
   getJiraStatus: () => apiClient.get<JiraStatus>('/integrations/jira/status').then((res) => res.data),
 
@@ -34,9 +41,15 @@ export const integrationsApi = {
   previewJiraImport: (projectKey: string) =>
     apiClient.get<ImportRow[]>(`/integrations/jira/projects/${projectKey}/preview`).then((res) => res.data),
 
-  importJiraProject: (projectKey: string, teamId: string) =>
-    apiClient.post<ImportSummary>(`/integrations/jira/projects/${projectKey}/import`, null, { params: { teamId } }).then((res) => res.data),
+  importJiraProject: (projectKey: string, teamId: string, setAutoSync?: boolean) =>
+    apiClient.post<ImportSummary>(`/integrations/jira/projects/${projectKey}/import`, null, { params: { teamId, setAutoSync } }).then((res) => res.data),
 
-  createTeamFromJira: (projectKey: string, teamName?: string) =>
-    apiClient.post<CreateTeamFromJiraResult>(`/integrations/jira/projects/${projectKey}/create-team`, { teamName }).then((res) => res.data),
+  createTeamFromJira: (projectKey: string, teamName?: string, setAutoSync?: boolean) =>
+    apiClient.post<CreateTeamFromJiraResult>(`/integrations/jira/projects/${projectKey}/create-team`, { teamName, setAutoSync }).then((res) => res.data),
+
+  getJiraSyncStatus: (teamId: string) =>
+    apiClient.get<JiraSyncStatus>(`/integrations/jira/teams/${teamId}/sync-status`).then((res) => res.data),
+
+  setJiraAutoSync: (teamId: string, enabled: boolean) =>
+    apiClient.put(`/integrations/jira/teams/${teamId}/auto-sync`, { enabled }),
 }

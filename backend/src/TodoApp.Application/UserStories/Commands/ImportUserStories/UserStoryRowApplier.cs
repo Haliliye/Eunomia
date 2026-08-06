@@ -5,28 +5,23 @@ using TodoApp.Domain.Users;
 
 namespace TodoApp.Application.UserStories.Commands.ImportUserStories;
 
+/// <summary>Story ids keyed by the Jira issue key that produced them — lets JiraProjectImportService resolve issue links/comments/attachments against the right story right after this batch, without a second DB round trip per row.</summary>
+internal record ApplyResult(int CreatedCount, int UpdatedCount, IReadOnlyDictionary<string, string> StoryIdByJiraKey);
+
 /// <summary>
 /// Turns already-parsed+validated ImportRowDtos into real UserStory
 /// aggregates on a team. Shared by ImportUserStoriesCommandHandler (CSV) and
-/// ImportFromJiraCommandHandler (Jira OAuth) — the two sources differ only in
+/// JiraProjectImportService (Jira OAuth) — the two sources differ only in
 /// how they produce ImportRowDtos, not in what happens once you have them.
+///
+/// Rows carrying a JiraIssueKey are matched against existing stories with
+/// that same key on this team and updated in place instead of creating a
+/// duplicate — this is what makes re-importing the same Jira project safe to
+/// run repeatedly (see also JiraProjectSync's periodic auto-sync).
 /// </summary>
 internal static class UserStoryRowApplier
 {
-    // Mirrors UserStory.ChangeStatus's allowed workflow — a story always starts
-    // at ToDo, so reaching an arbitrary imported starting status means walking
-    // through every intermediate step in order (Debug isn't offered as an
-    // import target; nothing in a fresh import would sensibly start there).
-    private static readonly Dictionary<string, UserStoryStatus[]> StatusPath = new()
-    {
-        ["ToDo"] = Array.Empty<UserStoryStatus>(),
-        ["Analyze"] = new[] { UserStoryStatus.Analyze },
-        ["Dev"] = new[] { UserStoryStatus.Analyze, UserStoryStatus.Dev },
-        ["Test"] = new[] { UserStoryStatus.Analyze, UserStoryStatus.Dev, UserStoryStatus.Test },
-        ["Done"] = new[] { UserStoryStatus.Analyze, UserStoryStatus.Dev, UserStoryStatus.Test, UserStoryStatus.Done },
-    };
-
-    public static async Task<int> ApplyAsync(
+    public static async Task<ApplyResult> ApplyAsync(
         Team team,
         IReadOnlyList<ImportRowDto> rows,
         IUserStoryRepository userStoryRepository,
@@ -35,24 +30,44 @@ internal static class UserStoryRowApplier
         CancellationToken cancellationToken)
     {
         var labelIdByName = team.Labels.ToDictionary(l => l.Name, l => l.Id, StringComparer.OrdinalIgnoreCase);
+
+        var jiraKeys = rows.Where(r => r.IsValid && r.JiraIssueKey is not null).Select(r => r.JiraIssueKey!).Distinct().ToList();
+        var existingByKey = (await userStoryRepository.GetByJiraIssueKeysAsync(team.Id, jiraKeys, cancellationToken))
+            .Where(s => s.JiraIssueKey is not null)
+            .ToDictionary(s => s.JiraIssueKey!, s => s);
+
         var createdCount = 0;
+        var updatedCount = 0;
+        var storyIdByJiraKey = new Dictionary<string, string>();
 
         foreach (var row in rows)
         {
             if (!row.IsValid) continue; // invalid rows are skipped, not fatal to the whole import
 
-            // The importer is recorded as reporter — the CSV/Jira source
-            // doesn't reliably map to one of our accounts (same reasoning as
-            // AssigneeEmail's fallback), and "who ran the import" is a more
-            // useful fact than "unknown" anyway.
-            var story = UserStory.Create(Guid.NewGuid().ToString(), team.Id, row.Title!, row.Description, createdByUserId: requestingUserId);
+            var isUpdate = row.JiraIssueKey is not null && existingByKey.TryGetValue(row.JiraIssueKey, out _);
+            UserStory story;
+            if (isUpdate)
+            {
+                story = existingByKey[row.JiraIssueKey!];
+                story.UpdateDetails(row.Title!, row.Description);
+            }
+            else
+            {
+                // The importer is recorded as reporter — the CSV/Jira source
+                // doesn't reliably map to one of our accounts (same reasoning
+                // as AssigneeEmail's fallback), and "who ran the import" is a
+                // more useful fact than "unknown" anyway.
+                story = UserStory.Create(Guid.NewGuid().ToString(), team.Id, row.Title!, row.Description,
+                    createdByUserId: requestingUserId, jiraIssueKey: row.JiraIssueKey);
+            }
 
             if (row.DueDate.HasValue) story.SetDueDate(row.DueDate);
             if (row.StoryPoints.HasValue) story.SetStoryPoints(row.StoryPoints);
             if (Enum.TryParse<UserStoryPriority>(row.Priority, out var priority)) story.ChangePriority(priority);
-
-            if (StatusPath.TryGetValue(row.Status, out var path))
-                foreach (var step in path) story.ChangeStatus(step);
+            // Status changes are unrestricted (see UserStory.ChangeStatus) so
+            // this can jump straight to wherever the source says the item is,
+            // no need to walk intermediate steps.
+            if (Enum.TryParse<UserStoryStatus>(row.Status, out var status)) story.ChangeStatus(status);
 
             // Only an email that resolves to an actual team member gets
             // assigned — anything else (typo, someone outside the team, blank)
@@ -64,14 +79,28 @@ internal static class UserStoryRowApplier
                     story.Assign(assignee.Id);
             }
 
+            // Additive only, even on update — a label present on the team but
+            // no longer on the Jira issue isn't removed, since someone may
+            // have applied it for Eunomia-only reasons after the last import.
             foreach (var labelName in row.LabelNames)
                 if (labelIdByName.TryGetValue(labelName, out var labelId))
                     story.AddLabel(labelId);
 
-            await userStoryRepository.AddAsync(story, cancellationToken);
-            createdCount++;
+            if (isUpdate)
+            {
+                await userStoryRepository.UpdateAsync(story, cancellationToken);
+                updatedCount++;
+            }
+            else
+            {
+                await userStoryRepository.AddAsync(story, cancellationToken);
+                createdCount++;
+            }
+
+            if (row.JiraIssueKey is not null)
+                storyIdByJiraKey[row.JiraIssueKey] = story.Id;
         }
 
-        return createdCount;
+        return new ApplyResult(createdCount, updatedCount, storyIdByJiraKey);
     }
 }

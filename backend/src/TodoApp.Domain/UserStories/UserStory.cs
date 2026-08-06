@@ -94,6 +94,9 @@ public class UserStory : AggregateRoot
     /// </summary>
     public string? ParentId { get; private set; }
 
+    /// <summary>The Jira issue key (e.g. "KAN-3") this story was imported from — null for stories created directly in Eunomia. Lets re-importing the same project update existing stories instead of creating duplicates; see UserStoryRowApplier.</summary>
+    public string? JiraIssueKey { get; private set; }
+
     private UserStory() { }
 
     private UserStory(string id, string teamId, string title, string? description) : base(id)
@@ -104,7 +107,7 @@ public class UserStory : AggregateRoot
         CreatedOn = DateTime.UtcNow;
     }
 
-    public static UserStory Create(string id, string teamId, string title, string? description, string? createdByUserId = null, string? parentId = null)
+    public static UserStory Create(string id, string teamId, string title, string? description, string? createdByUserId = null, string? parentId = null, string? jiraIssueKey = null)
     {
         if (string.IsNullOrWhiteSpace(title))
             throw new ArgumentException("Title is required.", nameof(title));
@@ -112,7 +115,8 @@ public class UserStory : AggregateRoot
         return new UserStory(id, teamId, title.Trim(), description?.Trim())
         {
             CreatedByUserId = createdByUserId,
-            ParentId = parentId
+            ParentId = parentId,
+            JiraIssueKey = jiraIssueKey
         };
     }
 
@@ -146,7 +150,8 @@ public class UserStory : AggregateRoot
         IEnumerable<TimeLogEntry>? timeLogEntries = null,
         IEnumerable<StoryLink>? links = null,
         string? createdByUserId = null,
-        string? parentId = null)
+        string? parentId = null,
+        string? jiraIssueKey = null)
     {
         var story = new UserStory(id, teamId, title, description)
         {
@@ -164,7 +169,8 @@ public class UserStory : AggregateRoot
             RecurrenceEndDate = recurrenceEndDate,
             EstimatedHours = estimatedHours,
             CreatedByUserId = createdByUserId,
-            ParentId = parentId
+            ParentId = parentId,
+            JiraIssueKey = jiraIssueKey
         };
 
         if (links is not null)

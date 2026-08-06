@@ -13,6 +13,7 @@ public record ImportRowDto(
     string? AssigneeEmail,
     DateTime? DueDate,
     int? StoryPoints,
-    IReadOnlyList<string> LabelNames);
+    IReadOnlyList<string> LabelNames,
+    string? JiraIssueKey = null);
 
-public record ImportSummaryDto(int CreatedCount, int SkippedCount, IReadOnlyList<ImportRowDto> Rows);
+public record ImportSummaryDto(int CreatedCount, int SkippedCount, IReadOnlyList<ImportRowDto> Rows, int UpdatedCount = 0);

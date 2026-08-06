@@ -89,9 +89,9 @@ public class IntegrationsController : ControllerBase
     }
 
     [HttpPost("projects/{projectKey}/import")]
-    public async Task<IActionResult> Import(string projectKey, [FromQuery] string teamId, CancellationToken cancellationToken)
+    public async Task<IActionResult> Import(string projectKey, [FromQuery] string teamId, [FromQuery] bool? setAutoSync, CancellationToken cancellationToken)
     {
-        var summary = await _mediator.Send(new ImportFromJiraCommand(teamId, User.GetUserId(), projectKey), cancellationToken);
+        var summary = await _mediator.Send(new ImportFromJiraCommand(teamId, User.GetUserId(), projectKey, setAutoSync), cancellationToken);
         return Ok(summary);
     }
 
@@ -99,9 +99,26 @@ public class IntegrationsController : ControllerBase
     [HttpPost("projects/{projectKey}/create-team")]
     public async Task<IActionResult> CreateTeamFromProject(string projectKey, [FromBody] CreateTeamFromJiraRequest? request, CancellationToken cancellationToken)
     {
-        var result = await _mediator.Send(new CreateTeamFromJiraCommand(User.GetUserId(), projectKey, request?.TeamName), cancellationToken);
+        var result = await _mediator.Send(new CreateTeamFromJiraCommand(User.GetUserId(), projectKey, request?.TeamName, request?.SetAutoSync), cancellationToken);
         return Ok(result);
     }
 
-    public record CreateTeamFromJiraRequest(string? TeamName);
+    public record CreateTeamFromJiraRequest(string? TeamName, bool? SetAutoSync);
+
+    /// <summary>Whether this team is linked to a Jira project and, if so, whether periodic auto-sync is on — see JiraProjectSync.</summary>
+    [HttpGet("teams/{teamId}/sync-status")]
+    public async Task<IActionResult> GetSyncStatus(string teamId, CancellationToken cancellationToken)
+    {
+        var status = await _mediator.Send(new GetJiraSyncStatusQuery(teamId, User.GetUserId()), cancellationToken);
+        return Ok(status);
+    }
+
+    [HttpPut("teams/{teamId}/auto-sync")]
+    public async Task<IActionResult> SetAutoSync(string teamId, [FromBody] SetAutoSyncRequest request, CancellationToken cancellationToken)
+    {
+        await _mediator.Send(new SetJiraAutoSyncCommand(teamId, User.GetUserId(), request.Enabled), cancellationToken);
+        return NoContent();
+    }
+
+    public record SetAutoSyncRequest(bool Enabled);
 }

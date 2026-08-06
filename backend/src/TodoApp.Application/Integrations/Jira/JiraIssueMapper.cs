@@ -33,7 +33,7 @@ internal static class JiraIssueMapper
         ["low"] = "Low", ["lowest"] = "Low", ["4"] = "Low", ["5"] = "Low",
     };
 
-    private static readonly string[] Headers = { "Title", "Description", "Status", "Priority", "DueDate", "Labels", "AssigneeEmail", "StoryPoints" };
+    private static readonly string[] Headers = { "Title", "Description", "Status", "Priority", "DueDate", "Labels", "AssigneeEmail", "StoryPoints", "JiraIssueKey" };
 
     public static List<ImportRowDto> MapAndValidate(IReadOnlyList<JiraIssueDto> issues)
     {
@@ -50,6 +50,7 @@ internal static class JiraIssueMapper
                 string.Join(";", issue.Labels),
                 issue.AssigneeEmail ?? string.Empty,
                 issue.StoryPoints?.ToString() ?? string.Empty,
+                issue.Key,
             });
         }
 
@@ -73,7 +74,8 @@ internal static class JiraIssueMapper
             LabelsColumn: "Labels",
             StatusValueMap: statusValueMap,
             PriorityValueMap: priorityValueMap,
-            AssigneeEmailColumn: "AssigneeEmail");
+            AssigneeEmailColumn: "AssigneeEmail",
+            JiraIssueKeyColumn: "JiraIssueKey");
 
         return ImportRowParser.ParseAndValidate(rows, mapping);
     }

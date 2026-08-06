@@ -21,6 +21,7 @@ export default function CreateTeamFromJiraModal({ onClose }: CreateTeamFromJiraM
   const [teamName, setTeamName] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<CreateTeamFromJiraResult | null>(null)
+  const [autoSync, setAutoSync] = useState(false)
 
   useEffect(() => {
     integrationsApi.getJiraStatus()
@@ -50,7 +51,7 @@ export default function CreateTeamFromJiraModal({ onClose }: CreateTeamFromJiraM
     setStep('creating')
     setError(null)
     try {
-      const created = await integrationsApi.createTeamFromJira(selectedProject.key, teamName.trim())
+      const created = await integrationsApi.createTeamFromJira(selectedProject.key, teamName.trim(), autoSync)
       setResult(created)
       setStep('summary')
     } catch (err: any) {
@@ -115,10 +116,15 @@ export default function CreateTeamFromJiraModal({ onClose }: CreateTeamFromJiraM
               <input id="jira-team-name" className="input" value={teamName} onChange={(e) => setTeamName(e.target.value)} maxLength={50} autoFocus />
             </div>
             <p style={{ fontSize: 11.5, color: 'var(--color-ink-faint)', marginTop: 4 }}>
-              Every issue in {selectedProject.name} ({selectedProject.key}) will be imported. Assignees with a matching
-              Eunomia account are assigned automatically; others get an email invitation to join and are added to this
-              team once they sign up. Labels that don't exist yet are created for you.
+              Every issue in {selectedProject.name} ({selectedProject.key}) will be imported, along with
+              labels, story points, comments, attachments, sprints, and issue links. Assignees with a
+              matching Eunomia account are assigned automatically; others get an email invitation to
+              join and are added to this team once they sign up.
             </p>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, fontSize: 12.5 }}>
+              <input type="checkbox" checked={autoSync} onChange={(e) => setAutoSync(e.target.checked)} />
+              Keep this team in sync with Jira (re-imports automatically every few hours)
+            </label>
             {error && <p className="field-error" role="alert">{error}</p>}
             <div className="modal-actions" style={{ marginTop: 16 }}>
               <button className="btn" onClick={() => setStep('project')}>Back</button>
@@ -133,6 +139,7 @@ export default function CreateTeamFromJiraModal({ onClose }: CreateTeamFromJiraM
           <>
             <p style={{ marginTop: 4 }}>
               <strong>"{result.team.name}"</strong> was created with <strong>{result.importSummary.createdCount}</strong> stories.
+              {result.importSummary.updatedCount > 0 && ` ${result.importSummary.updatedCount} existing stories updated.`}
               {result.importSummary.skippedCount > 0 && ` ${result.importSummary.skippedCount} row(s) were skipped.`}
             </p>
             <div className="modal-actions" style={{ marginTop: 16 }}>

@@ -53,4 +53,7 @@ public interface IUserStoryRepository
 
     /// <summary>All subtasks of the given parent story — see UserStory.ParentId. SearchAsync/GetByTeamIdAsync deliberately exclude these (a subtask isn't a normal top-level backlog/board item), so this is the only way to fetch them.</summary>
     Task<IReadOnlyList<UserStory>> GetByParentIdAsync(string parentId, CancellationToken cancellationToken = default);
+
+    /// <summary>Every story in this team that has one of the given Jira issue keys already on file — used to decide create-vs-update when re-importing the same Jira project (see UserStoryRowApplier). One query instead of N.</summary>
+    Task<IReadOnlyList<UserStory>> GetByJiraIssueKeysAsync(string teamId, IEnumerable<string> jiraIssueKeys, CancellationToken cancellationToken = default);
 }

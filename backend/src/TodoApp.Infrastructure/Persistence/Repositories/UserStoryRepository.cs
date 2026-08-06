@@ -161,7 +161,8 @@ public class UserStoryRepository : IUserStoryRepository
             .Select(l => new StoryLinkDocument { LinkedStoryId = l.LinkedStoryId, LinkType = l.LinkType.ToString() })
             .ToList(),
         CreatedByUserId = story.CreatedByUserId,
-        ParentId = story.ParentId
+        ParentId = story.ParentId,
+        JiraIssueKey = story.JiraIssueKey
     };
 
     private static UserStory ToDomain(UserStoryDocument document) => UserStory.Rehydrate(
@@ -188,7 +189,8 @@ public class UserStoryRepository : IUserStoryRepository
         document.TimeLogEntries.Select(t => new TimeLogEntry(t.Id, t.Hours, t.Note, t.LoggedByUserId, t.LoggedOn)),
         document.Links.Select(l => new StoryLink(l.LinkedStoryId, Enum.Parse<StoryLinkType>(l.LinkType))),
         document.CreatedByUserId,
-        document.ParentId);
+        document.ParentId,
+        document.JiraIssueKey);
 
     public async Task<IReadOnlyList<UserStory>> GetPendingReminderCandidatesAsync(CancellationToken cancellationToken = default)
     {
@@ -216,6 +218,19 @@ public class UserStoryRepository : IUserStoryRepository
     public async Task<IReadOnlyList<UserStory>> GetByParentIdAsync(string parentId, CancellationToken cancellationToken = default)
     {
         var documents = await _userStories.Find(s => s.ParentId == parentId).ToListAsync(cancellationToken);
+        return documents.Select(ToDomain).ToList();
+    }
+
+    public async Task<IReadOnlyList<UserStory>> GetByJiraIssueKeysAsync(string teamId, IEnumerable<string> jiraIssueKeys, CancellationToken cancellationToken = default)
+    {
+        var keys = jiraIssueKeys.ToList();
+        if (keys.Count == 0) return new List<UserStory>();
+
+        var filter = Builders<UserStoryDocument>.Filter.And(
+            Builders<UserStoryDocument>.Filter.Eq(s => s.TeamId, teamId),
+            Builders<UserStoryDocument>.Filter.In(s => s.JiraIssueKey, keys));
+
+        var documents = await _userStories.Find(filter).ToListAsync(cancellationToken);
         return documents.Select(ToDomain).ToList();
     }
 }

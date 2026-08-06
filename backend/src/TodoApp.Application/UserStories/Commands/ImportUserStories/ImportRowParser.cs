@@ -45,6 +45,7 @@ internal static class ImportRowParser
         var storyPointsIndex = IndexFor(mapping.StoryPointsColumn);
         var labelsIndex = IndexFor(mapping.LabelsColumn);
         var assigneeEmailIndex = IndexFor(mapping.AssigneeEmailColumn);
+        var jiraIssueKeyIndex = IndexFor(mapping.JiraIssueKeyColumn);
 
         // Skip the header row.
         for (var i = 1; i < rows.Count; i++)
@@ -75,13 +76,15 @@ internal static class ImportRowParser
                 .ToList();
 
             var assigneeEmail = Col(assigneeEmailIndex);
+            var jiraIssueKey = Col(jiraIssueKeyIndex);
 
             // A source's assignee name (CSV exports) can't be reliably matched
             // to one of our accounts, so that path stays unassigned — but a
             // real email (Jira's OAuth API, via AssigneeEmailColumn) can be,
             // resolved downstream in UserStoryRowApplier.
             results.Add(new ImportRowDto(rowNumber, true, null, title, string.IsNullOrWhiteSpace(description) ? null : description,
-                status, priority, string.IsNullOrWhiteSpace(assigneeEmail) ? null : assigneeEmail, dueDate, storyPoints, labelNames));
+                status, priority, string.IsNullOrWhiteSpace(assigneeEmail) ? null : assigneeEmail, dueDate, storyPoints, labelNames,
+                string.IsNullOrWhiteSpace(jiraIssueKey) ? null : jiraIssueKey));
         }
 
         return results;

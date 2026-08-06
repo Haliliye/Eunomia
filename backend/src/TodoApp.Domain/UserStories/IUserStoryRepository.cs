@@ -50,4 +50,7 @@ public interface IUserStoryRepository
     /// across ALL of their teams — assignee ids are globally unique per user, so
     /// this doesn't need to know which teams to look in.</summary>
     Task<IReadOnlyList<UserStory>> GetByAssigneeIdAsync(string assigneeId, CancellationToken cancellationToken = default);
+
+    /// <summary>All subtasks of the given parent story — see UserStory.ParentId. SearchAsync/GetByTeamIdAsync deliberately exclude these (a subtask isn't a normal top-level backlog/board item), so this is the only way to fetch them.</summary>
+    Task<IReadOnlyList<UserStory>> GetByParentIdAsync(string parentId, CancellationToken cancellationToken = default);
 }

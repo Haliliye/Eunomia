@@ -31,6 +31,8 @@ public class UserStoryDocument
     public double? EstimatedHours { get; set; }
     public List<TimeLogEntryDocument> TimeLogEntries { get; set; } = new();
     public List<StoryLinkDocument> Links { get; set; } = new();
+    public string? CreatedByUserId { get; set; }
+    public string? ParentId { get; set; }
 }
 
 public class StoryLinkDocument

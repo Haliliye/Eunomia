@@ -52,4 +52,7 @@ export interface UserStory {
   timeLogEntries: TimeLogEntry[]
   totalLoggedHours: number
   links: StoryLink[]
+  createdOn: string
+  createdByUserId?: string
+  parentId?: string
 }

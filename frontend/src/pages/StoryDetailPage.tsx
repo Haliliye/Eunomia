@@ -15,6 +15,8 @@ import Attachments from '@/components/userStories/Attachments'
 import TimeTracking from '@/components/userStories/TimeTracking'
 import StoryActivity from '@/components/userStories/StoryActivity'
 import StoryLinks from '@/components/userStories/StoryLinks'
+import Subtasks from '@/components/userStories/Subtasks'
+import StoryActivityTabs from '@/components/userStories/StoryActivityTabs'
 import MarkdownContent from '@/components/common/MarkdownContent'
 import { Skeleton } from '@/components/common/Skeleton'
 import { useUserNames, displayNameOrId } from '@/hooks/useUserNames'
@@ -32,7 +34,7 @@ export default function StoryDetailPage() {
   const [story, setStory] = useState<UserStory | null>(null)
   const [isLoading, setLoading] = useState(true)
   const [isEditing, setEditing] = useState(false)
-  const userNames = useUserNames([...(team?.members.map((m) => m.userId) ?? []), story?.assigneeId])
+  const userNames = useUserNames([...(team?.members.map((m) => m.userId) ?? []), story?.assigneeId, story?.createdByUserId])
 
   const load = () => {
     if (!teamId || !storyId) return
@@ -135,61 +137,73 @@ export default function StoryDetailPage() {
         {story.isArchived && <StatusBadge status={story.status} />}
       </div>
 
-      {story.description && (
-        <div className="card">
-          <MarkdownContent content={story.description} />
-        </div>
-      )}
+      <div className="story-detail-grid">
+        <div>
+          {story.description && (
+            <div className="card">
+              <MarkdownContent content={story.description} />
+            </div>
+          )}
 
-      <div className="card">
-        <div className="card-header"><h3>Details</h3></div>
-        <div className="dashboard-metric-row"><span className="dashboard-label">Assignee</span><span>{story.assigneeId ? displayNameOrId(userNames, story.assigneeId) : 'Unassigned'}</span></div>
-        <div className="dashboard-metric-row"><span className="dashboard-label">Priority</span><PriorityBadge priority={story.priority} /></div>
-        <div className="dashboard-metric-row"><span className="dashboard-label">Story points</span><span>{story.storyPoints ?? 'Not estimated'}</span></div>
-        <div className="dashboard-metric-row"><span className="dashboard-label">Due date</span><span className={isOverdue(story) ? 'backlog-due-date overdue' : undefined}>{story.dueDate ? new Date(story.dueDate).toLocaleDateString() : 'No due date'}</span></div>
-        <div className="dashboard-metric-row"><span className="dashboard-label">Archived</span><span>{story.isArchived ? 'Yes' : 'No'}</span></div>
-      </div>
+          <Subtasks story={story} teamId={team.id} teamName={team.name} />
 
-      {team.labels.length > 0 && (
-        <div className="card">
-          <div className="card-header"><h3>Labels</h3></div>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            {team.labels.map((label) => {
-              const applied = story.labelIds.includes(label.id)
-              return (
-                <button
-                  key={label.id}
-                  onClick={() => handleToggleLabel(label.id)}
-                  style={{ border: 'none', background: 'none', padding: 0, cursor: 'pointer', opacity: applied ? 1 : 0.4 }}
-                  title={applied ? `Remove ${label.name}` : `Apply ${label.name}`}
-                >
-                  <LabelChip label={label} />
-                </button>
-              )
-            })}
+          <div className="card">
+            <Checklist userStoryId={story.id} items={story.checklistItems} onChange={load} />
           </div>
+
+          <RecurrenceControl story={story} onChange={load} />
+
+          <div className="card">
+            <Attachments userStoryId={story.id} attachments={story.attachments} userNames={userNames} onChange={load} />
+          </div>
+
+          <StoryLinks story={story} teamName={team.name} />
+
+          <StoryActivityTabs
+            comments={
+              <div className="card">
+                <CommentSection userStoryId={story.id} members={team.members} userNames={userNames} />
+              </div>
+            }
+            history={<StoryActivity userStoryId={story.id} userNames={userNames} />}
+            worklog={<TimeTracking story={story} userNames={userNames} onChange={load} />}
+          />
         </div>
-      )}
 
-      <div className="card">
-        <Checklist userStoryId={story.id} items={story.checklistItems} onChange={load} />
+        <div className="story-detail-sidebar">
+          <div className="card">
+            <div className="card-header"><h3>Details</h3></div>
+            <div className="dashboard-metric-row"><span className="dashboard-label">Assignee</span><span>{story.assigneeId ? displayNameOrId(userNames, story.assigneeId) : 'Unassigned'}</span></div>
+            <div className="dashboard-metric-row"><span className="dashboard-label">Reporter</span><span>{story.createdByUserId ? displayNameOrId(userNames, story.createdByUserId) : 'Unknown'}</span></div>
+            <div className="dashboard-metric-row"><span className="dashboard-label">Priority</span><PriorityBadge priority={story.priority} /></div>
+            <div className="dashboard-metric-row"><span className="dashboard-label">Story points</span><span>{story.storyPoints ?? 'Not estimated'}</span></div>
+            <div className="dashboard-metric-row"><span className="dashboard-label">Due date</span><span className={isOverdue(story) ? 'backlog-due-date overdue' : undefined}>{story.dueDate ? new Date(story.dueDate).toLocaleDateString() : 'No due date'}</span></div>
+            <div className="dashboard-metric-row"><span className="dashboard-label">Created</span><span>{new Date(story.createdOn).toLocaleDateString()}</span></div>
+            <div className="dashboard-metric-row"><span className="dashboard-label">Archived</span><span>{story.isArchived ? 'Yes' : 'No'}</span></div>
+          </div>
+
+          {team.labels.length > 0 && (
+            <div className="card">
+              <div className="card-header"><h3>Labels</h3></div>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {team.labels.map((label) => {
+                  const applied = story.labelIds.includes(label.id)
+                  return (
+                    <button
+                      key={label.id}
+                      onClick={() => handleToggleLabel(label.id)}
+                      style={{ border: 'none', background: 'none', padding: 0, cursor: 'pointer', opacity: applied ? 1 : 0.4 }}
+                      title={applied ? `Remove ${label.name}` : `Apply ${label.name}`}
+                    >
+                      <LabelChip label={label} />
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
-
-      <RecurrenceControl story={story} onChange={load} />
-
-      <div className="card">
-        <Attachments userStoryId={story.id} attachments={story.attachments} userNames={userNames} onChange={load} />
-      </div>
-
-      <TimeTracking story={story} userNames={userNames} onChange={load} />
-
-      <div className="card">
-        <CommentSection userStoryId={story.id} members={team.members} userNames={userNames} />
-      </div>
-
-      <StoryLinks story={story} teamName={team.name} />
-
-      <StoryActivity userStoryId={story.id} userNames={userNames} />
 
       <EditUserStoryModal
         story={isEditing ? story : null}

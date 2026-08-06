@@ -73,7 +73,7 @@ public class JiraProjectImportService
             await _teamRepository.UpdateAsync(team, cancellationToken);
         }
 
-        var createdCount = await UserStoryRowApplier.ApplyAsync(team, rows, _userStoryRepository, _userRepository, cancellationToken);
+        var createdCount = await UserStoryRowApplier.ApplyAsync(team, rows, _userStoryRepository, _userRepository, requestingUserId, cancellationToken);
 
         await InviteUnregisteredAssigneesAsync(team, issues, requestingUserId, cancellationToken);
 

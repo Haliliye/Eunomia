@@ -26,5 +26,7 @@ internal static class UserStoryMapper
         story.EstimatedHours,
         story.TimeLogEntries.Select(t => new TimeLogEntryDto(t.Id, t.Hours, t.Note, t.LoggedByUserId, t.LoggedOn)).ToList(),
         story.TotalLoggedHours,
-        story.Links.Select(l => new StoryLinkDto(l.LinkedStoryId, l.LinkType.ToString())).ToList());
+        story.Links.Select(l => new StoryLinkDto(l.LinkedStoryId, l.LinkType.ToString())).ToList(),
+        story.CreatedByUserId,
+        story.ParentId);
 }

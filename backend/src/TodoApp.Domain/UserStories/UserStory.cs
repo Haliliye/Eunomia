@@ -81,6 +81,19 @@ public class UserStory : AggregateRoot
     /// <summary>US-138 AC: "a running total of logged time".</summary>
     public double TotalLoggedHours => _timeLogEntries.Sum(t => t.Hours);
 
+    /// <summary>Who created this story — shown as "Reporter" (Jira's term) on the detail page. Nullable only because stories created before this field existed have no value on file.</summary>
+    public string? CreatedByUserId { get; private set; }
+
+    /// <summary>
+    /// References another UserStory's Id — this story is a subtask of that
+    /// one (Jira's model: subtasks are lightweight child work items, and a
+    /// subtask can't itself have subtasks — enforced in CreateSubtask, not
+    /// here, since a subtask is otherwise a completely ordinary UserStory
+    /// with its own status/assignee/etc). Null means this is a normal,
+    /// top-level story.
+    /// </summary>
+    public string? ParentId { get; private set; }
+
     private UserStory() { }
 
     private UserStory(string id, string teamId, string title, string? description) : base(id)
@@ -91,12 +104,16 @@ public class UserStory : AggregateRoot
         CreatedOn = DateTime.UtcNow;
     }
 
-    public static UserStory Create(string id, string teamId, string title, string? description)
+    public static UserStory Create(string id, string teamId, string title, string? description, string? createdByUserId = null, string? parentId = null)
     {
         if (string.IsNullOrWhiteSpace(title))
             throw new ArgumentException("Title is required.", nameof(title));
 
-        return new UserStory(id, teamId, title.Trim(), description?.Trim());
+        return new UserStory(id, teamId, title.Trim(), description?.Trim())
+        {
+            CreatedByUserId = createdByUserId,
+            ParentId = parentId
+        };
     }
 
     /// <summary>
@@ -127,7 +144,9 @@ public class UserStory : AggregateRoot
         IEnumerable<Attachment>? attachments = null,
         double? estimatedHours = null,
         IEnumerable<TimeLogEntry>? timeLogEntries = null,
-        IEnumerable<StoryLink>? links = null)
+        IEnumerable<StoryLink>? links = null,
+        string? createdByUserId = null,
+        string? parentId = null)
     {
         var story = new UserStory(id, teamId, title, description)
         {
@@ -143,7 +162,9 @@ public class UserStory : AggregateRoot
             ReminderSentOn = reminderSentOn,
             RecurrenceFrequency = recurrenceFrequency,
             RecurrenceEndDate = recurrenceEndDate,
-            EstimatedHours = estimatedHours
+            EstimatedHours = estimatedHours,
+            CreatedByUserId = createdByUserId,
+            ParentId = parentId
         };
 
         if (links is not null)

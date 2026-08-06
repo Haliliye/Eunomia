@@ -42,7 +42,7 @@ public class ConvertPersonalTaskCommandHandler : IRequestHandler<ConvertPersonal
         // frontend's list of choices isn't a security boundary on its own.
         team.EnsureIsMember(request.RequestingUserId);
 
-        var story = UserStory.Create(Guid.NewGuid().ToString(), team.Id, task.Title, task.Description);
+        var story = UserStory.Create(Guid.NewGuid().ToString(), team.Id, task.Title, task.Description, createdByUserId: request.RequestingUserId);
         if (task.DueDate.HasValue) story.SetDueDate(task.DueDate);
 
         await _userStoryRepository.AddAsync(story, cancellationToken);

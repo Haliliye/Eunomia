@@ -36,9 +36,15 @@ public class DeleteUserStoryCommandHandler : IRequestHandler<DeleteUserStoryComm
             ?? throw new KeyNotFoundException("Team not found.");
         team.EnsureIsOwnerOrAdmin(request.RequestingUserId);
 
-        // Cascade: a story's comments have no reason to outlive the story itself.
-        await _commentRepository.DeleteByUserStoryIdsAsync(new[] { story.Id }, cancellationToken);
-        await _userStoryRepository.DeleteAsync(story.Id, cancellationToken);
+        // Cascade: a story's comments have no reason to outlive the story
+        // itself, and neither do its subtasks — they're not independently
+        // meaningful without the parent (see UserStory.ParentId).
+        var subtasks = await _userStoryRepository.GetByParentIdAsync(story.Id, cancellationToken);
+        var idsToDelete = new[] { story.Id }.Concat(subtasks.Select(s => s.Id)).ToList();
+
+        await _commentRepository.DeleteByUserStoryIdsAsync(idsToDelete, cancellationToken);
+        foreach (var id in idsToDelete)
+            await _userStoryRepository.DeleteAsync(id, cancellationToken);
 
         await _realtimeNotifier.NotifyTeamAsync(story.TeamId, new { type = "storyChanged", storyId = story.Id }, cancellationToken);
     }

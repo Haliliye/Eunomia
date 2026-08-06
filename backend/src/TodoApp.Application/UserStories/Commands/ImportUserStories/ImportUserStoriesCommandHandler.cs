@@ -32,7 +32,7 @@ public class ImportUserStoriesCommandHandler : IRequestHandler<ImportUserStories
         team.EnsureIsOwnerOrAdmin(request.RequestingUserId);
 
         var rows = ImportRowParser.ParseAndValidate(request.CsvContent, request.Mapping);
-        var createdCount = await UserStoryRowApplier.ApplyAsync(team, rows, _userStoryRepository, _userRepository, cancellationToken);
+        var createdCount = await UserStoryRowApplier.ApplyAsync(team, rows, _userStoryRepository, _userRepository, request.RequestingUserId, cancellationToken);
 
         await _realtimeNotifier.NotifyTeamAsync(team.Id, new { type = "storyChanged", storyId = (string?)null }, cancellationToken);
 

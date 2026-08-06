@@ -49,7 +49,7 @@ public class BulkCreateUserStoriesCommandHandler : IRequestHandler<BulkCreateUse
         var created = new List<UserStoryDto>();
         foreach (var title in titles)
         {
-            var story = UserStory.Create(Guid.NewGuid().ToString(), team.Id, title, null);
+            var story = UserStory.Create(Guid.NewGuid().ToString(), team.Id, title, null, createdByUserId: request.RequestingUserId);
             await _userStoryRepository.AddAsync(story, cancellationToken);
 
             await _activityRepository.AddAsync(

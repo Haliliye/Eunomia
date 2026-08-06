@@ -36,7 +36,8 @@ public class CreateUserStoryCommandHandler : IRequestHandler<CreateUserStoryComm
             id: Guid.NewGuid().ToString(),
             teamId: request.TeamId,
             title: request.Title,
-            description: request.Description);
+            description: request.Description,
+            createdByUserId: request.CreatedByUserId);
 
         await _userStoryRepository.AddAsync(story, cancellationToken);
 

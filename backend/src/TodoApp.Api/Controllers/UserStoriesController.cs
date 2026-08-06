@@ -10,6 +10,7 @@ using TodoApp.Application.UserStories.Commands.AssignUserStory;
 using TodoApp.Application.UserStories.Commands.ChangePriority;
 using TodoApp.Application.UserStories.Commands.ChangeStatus;
 using TodoApp.Application.UserStories.Commands.CreateUserStory;
+using TodoApp.Application.UserStories.Commands.CreateSubtask;
 using TodoApp.Application.UserStories.Commands.DeleteUserStory;
 using TodoApp.Application.UserStories.Commands.MoveUserStoryToSprint;
 using TodoApp.Application.UserStories.Commands.RemoveAttachment;
@@ -26,6 +27,7 @@ using TodoApp.Application.UserStories.Commands.ImportUserStories;
 using TodoApp.Application.UserStories.Queries.ExportUserStories;
 using TodoApp.Application.UserStories.Queries.GetAttachmentDownload;
 using TodoApp.Application.UserStories.Queries.GetStoryLinks;
+using TodoApp.Application.UserStories.Queries.GetSubtasks;
 using TodoApp.Application.UserStories.Commands.ToggleChecklistItem;
 using TodoApp.Application.UserStories.Commands.UnarchiveUserStory;
 using TodoApp.Application.UserStories.Commands.UpdateUserStory;
@@ -104,6 +106,23 @@ public class UserStoriesController : ControllerBase
         await _mediator.Send(new AddStoryLinkCommand(id, request.LinkedStoryId, request.LinkType, User.GetUserId()), cancellationToken);
         return NoContent();
     }
+
+    /// <summary>This story's subtasks — see UserStory.ParentId. Deliberately excluded from the normal backlog/board listing (SearchAsync), same as Jira.</summary>
+    [HttpGet("{id}/subtasks")]
+    public async Task<IActionResult> GetSubtasks(string id, CancellationToken cancellationToken)
+    {
+        var subtasks = await _mediator.Send(new GetSubtasksQuery(id, User.GetUserId()), cancellationToken);
+        return Ok(subtasks);
+    }
+
+    [HttpPost("{id}/subtasks")]
+    public async Task<IActionResult> CreateSubtask(string id, [FromBody] CreateSubtaskRequest request, CancellationToken cancellationToken)
+    {
+        var subtask = await _mediator.Send(new CreateSubtaskCommand(id, request.Title, User.GetUserId()), cancellationToken);
+        return CreatedAtAction(nameof(GetById), new { id = subtask.Id }, subtask);
+    }
+
+    public record CreateSubtaskRequest(string Title);
 
     [HttpDelete("{id}/links/{linkedStoryId}")]
     public async Task<IActionResult> RemoveLink(string id, string linkedStoryId, CancellationToken cancellationToken)

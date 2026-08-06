@@ -109,6 +109,12 @@ export const userStoriesApi = {
   removeLink: (id: string, linkedStoryId: string) =>
     apiClient.delete(`/userstories/${id}/links/${linkedStoryId}`),
 
+  getSubtasks: (id: string) =>
+    apiClient.get<UserStory[]>(`/userstories/${id}/subtasks`).then((res) => res.data),
+
+  createSubtask: (id: string, title: string) =>
+    apiClient.post<UserStory>(`/userstories/${id}/subtasks`, { title }).then((res) => res.data),
+
   exportCsv: (teamId: string, filters: UserStoryFilters, sprintId?: string, labelId?: string, showArchived = false) =>
     apiClient.get('/userstories/export', {
       params: { teamId, ...filters, sprintId, labelId, showArchived },

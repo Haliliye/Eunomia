@@ -26,4 +26,6 @@ public record UserStoryDto(
     double? EstimatedHours,
     IReadOnlyList<TimeLogEntryDto> TimeLogEntries,
     double TotalLoggedHours,
-    IReadOnlyList<StoryLinkDto> Links);
+    IReadOnlyList<StoryLinkDto> Links,
+    string? CreatedByUserId,
+    string? ParentId);

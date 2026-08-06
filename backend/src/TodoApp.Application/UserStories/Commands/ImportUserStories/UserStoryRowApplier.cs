@@ -31,6 +31,7 @@ internal static class UserStoryRowApplier
         IReadOnlyList<ImportRowDto> rows,
         IUserStoryRepository userStoryRepository,
         IUserRepository userRepository,
+        string requestingUserId,
         CancellationToken cancellationToken)
     {
         var labelIdByName = team.Labels.ToDictionary(l => l.Name, l => l.Id, StringComparer.OrdinalIgnoreCase);
@@ -40,7 +41,11 @@ internal static class UserStoryRowApplier
         {
             if (!row.IsValid) continue; // invalid rows are skipped, not fatal to the whole import
 
-            var story = UserStory.Create(Guid.NewGuid().ToString(), team.Id, row.Title!, row.Description);
+            // The importer is recorded as reporter — the CSV/Jira source
+            // doesn't reliably map to one of our accounts (same reasoning as
+            // AssigneeEmail's fallback), and "who ran the import" is a more
+            // useful fact than "unknown" anyway.
+            var story = UserStory.Create(Guid.NewGuid().ToString(), team.Id, row.Title!, row.Description, createdByUserId: requestingUserId);
 
             if (row.DueDate.HasValue) story.SetDueDate(row.DueDate);
             if (row.StoryPoints.HasValue) story.SetStoryPoints(row.StoryPoints);

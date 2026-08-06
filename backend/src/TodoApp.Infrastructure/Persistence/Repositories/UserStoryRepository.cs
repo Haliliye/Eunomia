@@ -72,6 +72,10 @@ public class UserStoryRepository : IUserStoryRepository
             // Archived stories are hidden from the normal backlog/board/dashboard
             // views by default — the Archived tab explicitly asks for the opposite.
             Builders<UserStoryDocument>.Filter.Eq(s => s.IsArchived, showArchived),
+            // Subtasks (ParentId set) aren't independent backlog/board items —
+            // they only ever appear nested under their parent's detail page
+            // (see GetByParentIdAsync), never in this top-level list.
+            Builders<UserStoryDocument>.Filter.Eq(s => s.ParentId, null),
         };
 
         if (!string.IsNullOrWhiteSpace(status))
@@ -155,7 +159,9 @@ public class UserStoryRepository : IUserStoryRepository
             .ToList(),
         Links = story.Links
             .Select(l => new StoryLinkDocument { LinkedStoryId = l.LinkedStoryId, LinkType = l.LinkType.ToString() })
-            .ToList()
+            .ToList(),
+        CreatedByUserId = story.CreatedByUserId,
+        ParentId = story.ParentId
     };
 
     private static UserStory ToDomain(UserStoryDocument document) => UserStory.Rehydrate(
@@ -180,7 +186,9 @@ public class UserStoryRepository : IUserStoryRepository
         document.Attachments.Select(a => new Attachment(a.Id, a.FileName, a.ContentType, a.SizeBytes, a.StorageKey, a.UploadedByUserId, a.UploadedOn)),
         document.EstimatedHours,
         document.TimeLogEntries.Select(t => new TimeLogEntry(t.Id, t.Hours, t.Note, t.LoggedByUserId, t.LoggedOn)),
-        document.Links.Select(l => new StoryLink(l.LinkedStoryId, Enum.Parse<StoryLinkType>(l.LinkType))));
+        document.Links.Select(l => new StoryLink(l.LinkedStoryId, Enum.Parse<StoryLinkType>(l.LinkType))),
+        document.CreatedByUserId,
+        document.ParentId);
 
     public async Task<IReadOnlyList<UserStory>> GetPendingReminderCandidatesAsync(CancellationToken cancellationToken = default)
     {
@@ -202,6 +210,12 @@ public class UserStoryRepository : IUserStoryRepository
             Builders<UserStoryDocument>.Filter.Eq(s => s.IsArchived, false));
 
         var documents = await _userStories.Find(filter).ToListAsync(cancellationToken);
+        return documents.Select(ToDomain).ToList();
+    }
+
+    public async Task<IReadOnlyList<UserStory>> GetByParentIdAsync(string parentId, CancellationToken cancellationToken = default)
+    {
+        var documents = await _userStories.Find(s => s.ParentId == parentId).ToListAsync(cancellationToken);
         return documents.Select(ToDomain).ToList();
     }
 }

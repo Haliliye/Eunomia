@@ -23,4 +23,11 @@ public static class EmailTemplates
         "<p>Someone requested a password reset for this account. This link expires in 1 hour.</p>",
         resetLink,
         "Reset password");
+
+    public static string SignupInvitation(string teamName, string inviterName, string signupLink) => string.Format(
+        Wrapper,
+        $"<p>{inviterName} moved {teamName}'s work into Eunomia and included you as an assignee. " +
+        $"Create an account with this same email address and you'll be added to {teamName} automatically.</p>",
+        signupLink,
+        "Create your account");
 }

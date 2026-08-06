@@ -17,6 +17,7 @@ public static class DependencyInjection
         services.AddValidatorsFromAssembly(typeof(DependencyInjection).Assembly);
 
         services.AddScoped<Integrations.Jira.JiraAccessTokenProvider>();
+        services.AddScoped<Integrations.Jira.JiraProjectImportService>();
 
         return services;
     }

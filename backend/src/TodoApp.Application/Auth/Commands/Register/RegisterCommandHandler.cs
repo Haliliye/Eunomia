@@ -4,6 +4,8 @@ using Microsoft.Extensions.Logging;
 using TodoApp.Application.Auth.DTOs;
 using TodoApp.Application.Common;
 using TodoApp.Domain.Auth;
+using TodoApp.Domain.Invitations;
+using TodoApp.Domain.Teams;
 using TodoApp.Domain.Users;
 
 namespace TodoApp.Application.Auth.Commands.Register;
@@ -17,6 +19,8 @@ public class RegisterCommandHandler : IRequestHandler<RegisterCommand, AuthResul
     private readonly IJwtTokenGenerator _jwtTokenGenerator;
     private readonly IRefreshTokenRepository _refreshTokenRepository;
     private readonly IEmailVerificationTokenRepository _verificationTokenRepository;
+    private readonly IEmailSignupInvitationRepository _signupInvitationRepository;
+    private readonly ITeamRepository _teamRepository;
     private readonly IEmailSender _emailSender;
     private readonly IEmailSettingsProvider _emailSettings;
     private readonly IHostEnvironment _environment;
@@ -28,6 +32,8 @@ public class RegisterCommandHandler : IRequestHandler<RegisterCommand, AuthResul
         IJwtTokenGenerator jwtTokenGenerator,
         IRefreshTokenRepository refreshTokenRepository,
         IEmailVerificationTokenRepository verificationTokenRepository,
+        IEmailSignupInvitationRepository signupInvitationRepository,
+        ITeamRepository teamRepository,
         IEmailSender emailSender,
         IEmailSettingsProvider emailSettings,
         IHostEnvironment environment,
@@ -38,6 +44,8 @@ public class RegisterCommandHandler : IRequestHandler<RegisterCommand, AuthResul
         _jwtTokenGenerator = jwtTokenGenerator;
         _refreshTokenRepository = refreshTokenRepository;
         _verificationTokenRepository = verificationTokenRepository;
+        _signupInvitationRepository = signupInvitationRepository;
+        _teamRepository = teamRepository;
         _emailSender = emailSender;
         _emailSettings = emailSettings;
         _environment = environment;
@@ -57,6 +65,8 @@ public class RegisterCommandHandler : IRequestHandler<RegisterCommand, AuthResul
             passwordHash: _passwordHasher.Hash(request.Password));
 
         await _userRepository.AddAsync(user, cancellationToken);
+
+        await FulfillPendingTeamInvitationsAsync(user, cancellationToken);
 
         var accessToken = _jwtTokenGenerator.GenerateToken(user);
         var (refreshToken, expiresOn) = _jwtTokenGenerator.GenerateRefreshToken();
@@ -98,5 +108,46 @@ public class RegisterCommandHandler : IRequestHandler<RegisterCommand, AuthResul
         }
 
         return new AuthResultDto(accessToken, refreshToken, user.Id, user.Email, user.DisplayName, user.IsEmailVerified, devToken);
+    }
+
+    /// <summary>
+    /// The other half of ImportFromJiraCommandHandler's signup invitations:
+    /// anyone who registers with an email that was invited (as a Jira
+    /// assignee with no Eunomia account yet) is auto-added to every team
+    /// that invited them, then those invitations are cleared. Best-effort —
+    /// a failure here shouldn't block the registration that's already
+    /// succeeded by this point.
+    /// </summary>
+    private async Task FulfillPendingTeamInvitationsAsync(User user, CancellationToken cancellationToken)
+    {
+        IReadOnlyList<EmailSignupInvitation> invitations;
+        try
+        {
+            invitations = await _signupInvitationRepository.GetByEmailAsync(user.Email, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to look up pending signup invitations for {Email}", user.Email);
+            return;
+        }
+
+        foreach (var invitation in invitations)
+        {
+            try
+            {
+                var team = await _teamRepository.GetByIdAsync(invitation.TeamId, cancellationToken);
+                if (team is not null && !team.Members.Any(m => m.UserId == user.Id))
+                {
+                    team.AddMemberFromInvitation(user.Id);
+                    await _teamRepository.UpdateAsync(team, cancellationToken);
+                }
+
+                await _signupInvitationRepository.DeleteAsync(invitation.Id, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to fulfil signup invitation {InvitationId} for {Email}", invitation.Id, user.Email);
+            }
+        }
     }
 }

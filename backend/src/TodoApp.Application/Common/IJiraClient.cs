@@ -40,4 +40,6 @@ public record JiraIssueDto(
     string StatusName,
     string? PriorityName,
     DateTime? DueDate,
-    IReadOnlyList<string> Labels);
+    IReadOnlyList<string> Labels,
+    string? AssigneeEmail,
+    int? StoryPoints);

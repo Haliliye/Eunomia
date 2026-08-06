@@ -1,5 +1,6 @@
 import { apiClient } from './client'
 import type { ImportRow, ImportSummary } from './userStories'
+import type { Team } from '@/types/team'
 
 export interface JiraStatus {
   isConnected: boolean
@@ -11,6 +12,11 @@ export interface JiraProject {
   key: string
   name: string
   avatarUrl?: string
+}
+
+export interface CreateTeamFromJiraResult {
+  team: Team
+  importSummary: ImportSummary
 }
 
 export const integrationsApi = {
@@ -30,4 +36,7 @@ export const integrationsApi = {
 
   importJiraProject: (projectKey: string, teamId: string) =>
     apiClient.post<ImportSummary>(`/integrations/jira/projects/${projectKey}/import`, null, { params: { teamId } }).then((res) => res.data),
+
+  createTeamFromJira: (projectKey: string, teamName?: string) =>
+    apiClient.post<CreateTeamFromJiraResult>(`/integrations/jira/projects/${projectKey}/create-team`, { teamName }).then((res) => res.data),
 }

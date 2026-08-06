@@ -118,12 +118,39 @@ public class JiraApiClient : IJiraClient
         return projects.Select(p => new JiraProjectDto(p.Key, p.Name, p.AvatarUrls?.FortyEight)).ToList();
     }
 
+    /// <summary>
+    /// Story points aren't a fixed field — Jira Cloud stores them as a
+    /// per-site custom field (e.g. customfield_10016), whose id varies by
+    /// instance and whose display name varies too ("Story Points" on classic
+    /// projects, "Story point estimate" on team-managed ones). Discovered
+    /// once per import by scanning GET /rest/api/2/field for a name
+    /// containing "story point" — null if the site has no such field (e.g.
+    /// story points aren't enabled on this project), in which case it's
+    /// simply left unmapped, same as any other CSV import that skips it.
+    /// </summary>
+    private async Task<string?> FindStoryPointsFieldIdAsync(string accessToken, string cloudId, CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"{ApiBaseUrl}/ex/jira/{cloudId}/rest/api/2/field");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
+        if (!response.IsSuccessStatusCode) return null; // don't fail the whole import over an optional field
+
+        var fields = await response.Content.ReadFromJsonAsync<List<FieldResponse>>(JsonOptions, cancellationToken) ?? new();
+        return fields.FirstOrDefault(f => f.Name.Contains("story point", StringComparison.OrdinalIgnoreCase))?.Id;
+    }
+
     public async Task<IReadOnlyList<JiraIssueDto>> GetIssuesAsync(string accessToken, string cloudId, string projectKey, CancellationToken cancellationToken = default)
     {
         var results = new List<JiraIssueDto>();
         string? nextPageToken = null;
         const int pageSize = 100;
         const int maxPages = 20; // safety cap (2000 issues) — the new search/jql endpoint's pagination has been reported flaky upstream; don't loop forever on it
+
+        var storyPointsFieldId = await FindStoryPointsFieldIdAsync(accessToken, cloudId, cancellationToken);
+        var requestedFields = storyPointsFieldId is null
+            ? new[] { "summary", "description", "status", "priority", "duedate", "labels", "assignee" }
+            : new[] { "summary", "description", "status", "priority", "duedate", "labels", "assignee", storyPointsFieldId };
 
         for (var page = 0; page < maxPages; page++)
         {
@@ -141,7 +168,7 @@ public class JiraApiClient : IJiraClient
                     jql = $"project = \"{projectKey}\" ORDER BY created ASC",
                     nextPageToken,
                     maxResults = pageSize,
-                    fields = new[] { "summary", "description", "status", "priority", "duedate", "labels" },
+                    fields = requestedFields,
                 }, options: JsonOptions),
             };
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
@@ -154,6 +181,17 @@ public class JiraApiClient : IJiraClient
 
             foreach (var issue in searchPage.Issues)
             {
+                int? storyPoints = null;
+                if (storyPointsFieldId is not null
+                    && issue.Fields.ExtraFields.TryGetValue(storyPointsFieldId, out var rawValue)
+                    && rawValue.ValueKind is JsonValueKind.Number)
+                {
+                    // Jira stores this as a decimal (0.5, 1, 2, 3, 5, 8, 13...)
+                    // but our domain's StoryPoints is a whole number — round
+                    // rather than truncate so e.g. 0.5 doesn't disappear to 0.
+                    storyPoints = (int)Math.Round(rawValue.GetDouble(), MidpointRounding.AwayFromZero);
+                }
+
                 results.Add(new JiraIssueDto(
                     issue.Key,
                     issue.Fields.Summary,
@@ -161,7 +199,9 @@ public class JiraApiClient : IJiraClient
                     issue.Fields.Status.Name,
                     issue.Fields.Priority?.Name,
                     DateTime.TryParse(issue.Fields.DueDate, out var due) ? due : null,
-                    issue.Fields.Labels ?? new List<string>()));
+                    issue.Fields.Labels ?? new List<string>(),
+                    issue.Fields.Assignee?.EmailAddress,
+                    storyPoints));
             }
 
             if (string.IsNullOrEmpty(searchPage.NextPageToken) || searchPage.Issues.Count == 0) break;
@@ -194,9 +234,26 @@ public class JiraApiClient : IJiraClient
         IssueStatus Status,
         IssuePriority? Priority,
         [property: JsonPropertyName("duedate")] string? DueDate,
-        List<string>? Labels);
+        List<string>? Labels,
+        IssueAssignee? Assignee)
+    {
+        // Catches custom fields we asked for (like story points) but didn't
+        // give a strongly-typed property — their key (e.g. "customfield_10016")
+        // is only known at runtime, discovered via FindStoryPointsFieldIdAsync.
+        [JsonExtensionData]
+        public Dictionary<string, JsonElement> ExtraFields { get; init; } = new();
+    }
 
     private record IssueStatus(string Name);
 
     private record IssuePriority(string Name);
+
+    // emailAddress can be null even when an assignee is set — Atlassian's
+    // per-user "email visibility" privacy setting can hide it from the API
+    // regardless of our scopes. When that happens the story is imported
+    // unassigned rather than failing the row (same fallback as a CSV row
+    // whose assignee doesn't match any team member).
+    private record IssueAssignee([property: JsonPropertyName("emailAddress")] string? EmailAddress);
+
+    private record FieldResponse(string Id, string Name);
 }

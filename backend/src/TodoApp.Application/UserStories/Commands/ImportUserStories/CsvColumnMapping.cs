@@ -18,4 +18,9 @@ public record CsvColumnMapping(
     string? StoryPointsColumn,
     string? LabelsColumn,
     Dictionary<string, string>? StatusValueMap,
-    Dictionary<string, string>? PriorityValueMap);
+    Dictionary<string, string>? PriorityValueMap,
+    // A source's assignee "name" (as in any CSV export) can't be reliably
+    // matched to one of our accounts — but a real email address (as Jira's
+    // OAuth API provides) can, via IUserRepository.GetByEmailAsync. Optional
+    // and defaulted to null so existing CSV-mapping callers are unaffected.
+    string? AssigneeEmailColumn = null);

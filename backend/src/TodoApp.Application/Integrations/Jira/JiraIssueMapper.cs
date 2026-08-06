@@ -33,7 +33,7 @@ internal static class JiraIssueMapper
         ["low"] = "Low", ["lowest"] = "Low", ["4"] = "Low", ["5"] = "Low",
     };
 
-    private static readonly string[] Headers = { "Title", "Description", "Status", "Priority", "DueDate", "Labels" };
+    private static readonly string[] Headers = { "Title", "Description", "Status", "Priority", "DueDate", "Labels", "AssigneeEmail", "StoryPoints" };
 
     public static List<ImportRowDto> MapAndValidate(IReadOnlyList<JiraIssueDto> issues)
     {
@@ -48,6 +48,8 @@ internal static class JiraIssueMapper
                 issue.PriorityName ?? string.Empty,
                 issue.DueDate?.ToString("yyyy-MM-dd") ?? string.Empty,
                 string.Join(";", issue.Labels),
+                issue.AssigneeEmail ?? string.Empty,
+                issue.StoryPoints?.ToString() ?? string.Empty,
             });
         }
 
@@ -67,11 +69,16 @@ internal static class JiraIssueMapper
             StatusColumn: "Status",
             PriorityColumn: "Priority",
             DueDateColumn: "DueDate",
-            StoryPointsColumn: null, // Jira story points live in a per-instance custom field id — not reliably available via the plain REST API without an extra lookup, so left unmapped (defaults to none, same as any CSV row that skips it)
+            StoryPointsColumn: "StoryPoints",
             LabelsColumn: "Labels",
             StatusValueMap: statusValueMap,
-            PriorityValueMap: priorityValueMap);
+            PriorityValueMap: priorityValueMap,
+            AssigneeEmailColumn: "AssigneeEmail");
 
         return ImportRowParser.ParseAndValidate(rows, mapping);
     }
+
+    /// <summary>Every distinct label name across the given issues — used by ImportFromJiraCommandHandler to auto-create any that don't already exist on the target team before applying rows (a label with no matching team label is otherwise silently dropped, same as CSV import).</summary>
+    public static IReadOnlyList<string> DistinctLabelNames(IReadOnlyList<JiraIssueDto> issues) =>
+        issues.SelectMany(i => i.Labels).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
 }

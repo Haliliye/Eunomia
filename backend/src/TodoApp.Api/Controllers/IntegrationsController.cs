@@ -94,4 +94,14 @@ public class IntegrationsController : ControllerBase
         var summary = await _mediator.Send(new ImportFromJiraCommand(teamId, User.GetUserId(), projectKey), cancellationToken);
         return Ok(summary);
     }
+
+    /// <summary>Creates a brand-new team from a Jira project in one step, instead of importing into an existing one.</summary>
+    [HttpPost("projects/{projectKey}/create-team")]
+    public async Task<IActionResult> CreateTeamFromProject(string projectKey, [FromBody] CreateTeamFromJiraRequest? request, CancellationToken cancellationToken)
+    {
+        var result = await _mediator.Send(new CreateTeamFromJiraCommand(User.GetUserId(), projectKey, request?.TeamName), cancellationToken);
+        return Ok(result);
+    }
+
+    public record CreateTeamFromJiraRequest(string? TeamName);
 }

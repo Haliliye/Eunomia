@@ -34,4 +34,5 @@ public class MongoDbContext
     public IMongoCollection<SprintDocument> Sprints => _database.GetCollection<SprintDocument>("sprints");
     public IMongoCollection<PersonalTaskDocument> PersonalTasks => _database.GetCollection<PersonalTaskDocument>("personalTasks");
     public IMongoCollection<JiraConnectionDocument> JiraConnections => _database.GetCollection<JiraConnectionDocument>("jiraConnections");
+    public IMongoCollection<EmailSignupInvitationDocument> EmailSignupInvitations => _database.GetCollection<EmailSignupInvitationDocument>("emailSignupInvitations");
 }

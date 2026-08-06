@@ -121,17 +121,25 @@ public class JiraApiClient : IJiraClient
     public async Task<IReadOnlyList<JiraIssueDto>> GetIssuesAsync(string accessToken, string cloudId, string projectKey, CancellationToken cancellationToken = default)
     {
         var results = new List<JiraIssueDto>();
-        var startAt = 0;
+        string? nextPageToken = null;
         const int pageSize = 100;
+        const int maxPages = 20; // safety cap (2000 issues) — the new search/jql endpoint's pagination has been reported flaky upstream; don't loop forever on it
 
-        while (true)
+        for (var page = 0; page < maxPages; page++)
         {
-            using var request = new HttpRequestMessage(HttpMethod.Post, $"{ApiBaseUrl}/ex/jira/{cloudId}/rest/api/2/search")
+            // The old GET/POST /rest/api/2/search was removed by Atlassian
+            // (returns 410 Gone as of 2025) — /search/jql is its replacement.
+            // Using the v2 path specifically (not v3) keeps `description` as
+            // a plain string instead of Atlassian Document Format (ADF), the
+            // same reasoning as the rest of this client. Pagination here is
+            // nextPageToken-based, not startAt/total — there's no total count
+            // in the response at all anymore.
+            using var request = new HttpRequestMessage(HttpMethod.Post, $"{ApiBaseUrl}/ex/jira/{cloudId}/rest/api/2/search/jql")
             {
                 Content = JsonContent.Create(new
                 {
                     jql = $"project = \"{projectKey}\" ORDER BY created ASC",
-                    startAt,
+                    nextPageToken,
                     maxResults = pageSize,
                     fields = new[] { "summary", "description", "status", "priority", "duedate", "labels" },
                 }, options: JsonOptions),
@@ -141,10 +149,10 @@ public class JiraApiClient : IJiraClient
             using var response = await _httpClient.SendAsync(request, cancellationToken);
             response.EnsureSuccessStatusCode();
 
-            var page = await response.Content.ReadFromJsonAsync<SearchResponse>(JsonOptions, cancellationToken)
+            var searchPage = await response.Content.ReadFromJsonAsync<SearchResponse>(JsonOptions, cancellationToken)
                 ?? throw new InvalidOperationException("Jira search response was empty.");
 
-            foreach (var issue in page.Issues)
+            foreach (var issue in searchPage.Issues)
             {
                 results.Add(new JiraIssueDto(
                     issue.Key,
@@ -156,8 +164,8 @@ public class JiraApiClient : IJiraClient
                     issue.Fields.Labels ?? new List<string>()));
             }
 
-            startAt += page.Issues.Count;
-            if (startAt >= page.Total || page.Issues.Count == 0) break;
+            if (string.IsNullOrEmpty(searchPage.NextPageToken) || searchPage.Issues.Count == 0) break;
+            nextPageToken = searchPage.NextPageToken;
         }
 
         return results;
@@ -176,7 +184,7 @@ public class JiraApiClient : IJiraClient
 
     private record ProjectAvatarUrls([property: JsonPropertyName("48x48")] string? FortyEight);
 
-    private record SearchResponse(int Total, List<IssueResponse> Issues);
+    private record SearchResponse(List<IssueResponse> Issues, [property: JsonPropertyName("nextPageToken")] string? NextPageToken);
 
     private record IssueResponse(string Key, IssueFields Fields);
 

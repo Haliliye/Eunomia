@@ -39,7 +39,7 @@ public class ChangeUserStoryStatusCommandHandler : IRequestHandler<ChangeUserSto
             ?? throw new KeyNotFoundException("Team not found.");
         team.EnsureIsMember(request.ChangedByUserId);
 
-        if (!Enum.TryParse<UserStoryStatus>(request.NewStatus, out var status))
+        if (!team.Columns.Any(c => c.Key == request.NewStatus))
             throw new ArgumentException($"Unknown status '{request.NewStatus}'.");
 
         var previousStatus = story.Status;
@@ -47,7 +47,7 @@ public class ChangeUserStoryStatusCommandHandler : IRequestHandler<ChangeUserSto
         // Team.ChangeStatus enforces the allowed workflow transitions
         // (To Do <-> In Progress <-> Done) and throws InvalidOperationException
         // for an illegal transition — let that surface as a 400 in the controller.
-        story.ChangeStatus(status);
+        story.ChangeStatus(request.NewStatus);
 
         await _userStoryRepository.UpdateAsync(story, cancellationToken);
 
@@ -62,7 +62,7 @@ public class ChangeUserStoryStatusCommandHandler : IRequestHandler<ChangeUserSto
         // US-129: a recurring story that just became Done spawns its next
         // occurrence automatically — CreateNextOccurrence returns null if this
         // story isn't recurring, or its recurrence end date has passed.
-        if (status == UserStoryStatus.Done)
+        if (request.NewStatus == "Done")
         {
             var nextOccurrence = story.CreateNextOccurrence(Guid.NewGuid().ToString());
             if (nextOccurrence is not null)

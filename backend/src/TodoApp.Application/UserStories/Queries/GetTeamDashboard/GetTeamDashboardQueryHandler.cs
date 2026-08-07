@@ -31,10 +31,10 @@ public class GetTeamDashboardQueryHandler : IRequestHandler<GetTeamDashboardQuer
             : allStories.Where(s => s.SprintId == request.SprintId).ToList();
 
         // US-117 AC: counts per status, and a breakdown of open items per assignee.
-        var countsByStatus = Enum.GetValues<UserStoryStatus>()
-            .ToDictionary(s => s.ToString(), s => stories.Count(story => story.Status == s));
+        var countsByStatus = team.Columns
+            .ToDictionary(c => c.Key, c => stories.Count(story => story.Status == c.Key));
 
-        var openStories = stories.Where(s => s.Status != UserStoryStatus.Done);
+        var openStories = stories.Where(s => s.Status != "Done");
         var countsByAssignee = openStories
             .GroupBy(s => s.AssigneeId ?? "Unassigned")
             .ToDictionary(g => g.Key, g => g.Count());

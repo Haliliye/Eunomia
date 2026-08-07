@@ -19,6 +19,14 @@ public class TeamDocument
     public List<LabelDocument> Labels { get; set; } = new();
     public List<ColumnWipLimitDocument> WipLimits { get; set; } = new();
     public List<StoryTemplateDocument> Templates { get; set; } = new();
+    public List<BoardColumnDocument> Columns { get; set; } = new();
+}
+
+public class BoardColumnDocument
+{
+    public string Key { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public int Order { get; set; }
 }
 
 public class StoryTemplateDocument

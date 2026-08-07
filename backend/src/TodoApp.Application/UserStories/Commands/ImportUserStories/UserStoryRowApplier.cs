@@ -64,10 +64,13 @@ internal static class UserStoryRowApplier
             if (row.DueDate.HasValue) story.SetDueDate(row.DueDate);
             if (row.StoryPoints.HasValue) story.SetStoryPoints(row.StoryPoints);
             if (Enum.TryParse<UserStoryPriority>(row.Priority, out var priority)) story.ChangePriority(priority);
-            // Status changes are unrestricted (see UserStory.ChangeStatus) so
-            // this can jump straight to wherever the source says the item is,
-            // no need to walk intermediate steps.
-            if (Enum.TryParse<UserStoryStatus>(row.Status, out var status)) story.ChangeStatus(status);
+            // Status is now a per-team board column key (see BoardColumn),
+            // not a fixed enum — only apply it if it actually matches one of
+            // this team's real columns; an unrecognized source value (e.g. a
+            // CSV export using a workflow this team doesn't have) leaves the
+            // story at its default ("ToDo") rather than creating a
+            // never-shown-on-any-column "ghost" status.
+            if (team.Columns.Any(c => c.Key == row.Status)) story.ChangeStatus(row.Status);
 
             // Only an email that resolves to an actual team member gets
             // assigned — anything else (typo, someone outside the team, blank)

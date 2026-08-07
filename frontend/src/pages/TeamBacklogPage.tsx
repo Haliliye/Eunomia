@@ -381,6 +381,7 @@ export default function TeamBacklogPage() {
 
       <UserStoryFilterBar
         members={team.members}
+        columns={team.columns}
         userNames={userNames}
         filters={filters}
         onChange={handleFiltersChange}

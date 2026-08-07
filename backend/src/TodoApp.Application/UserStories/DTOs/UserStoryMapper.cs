@@ -9,7 +9,7 @@ internal static class UserStoryMapper
         story.TeamId,
         story.Title,
         story.Description,
-        story.Status.ToString(),
+        story.Status,
         story.Priority.ToString(),
         story.AssigneeId,
         story.DueDate,

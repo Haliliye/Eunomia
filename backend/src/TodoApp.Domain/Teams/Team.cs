@@ -12,6 +12,13 @@ public class Team : AggregateRoot
     private readonly List<Label> _labels = new();
     private readonly List<ColumnWipLimit> _wipLimits = new();
     private readonly List<StoryTemplate> _templates = new();
+    private readonly List<BoardColumn> _columns = new();
+
+    /// <summary>Every team is seeded with these six on creation — see BoardColumn for why their Keys are protected.</summary>
+    private static readonly (string Key, string Name)[] DefaultColumns =
+    {
+        ("ToDo", "To Do"), ("Analyze", "Analyze"), ("Dev", "Dev"), ("Test", "Test"), ("Debug", "Debug"), ("Done", "Done"),
+    };
 
     public string Name { get; private set; } = string.Empty;
     public string? Description { get; private set; }
@@ -19,6 +26,7 @@ public class Team : AggregateRoot
     public IReadOnlyCollection<Label> Labels => _labels.AsReadOnly();
     public IReadOnlyCollection<ColumnWipLimit> WipLimits => _wipLimits.AsReadOnly();
     public IReadOnlyCollection<StoryTemplate> Templates => _templates.AsReadOnly();
+    public IReadOnlyList<BoardColumn> Columns => _columns.OrderBy(c => c.Order).ToList();
 
     private Team() { }
 
@@ -38,6 +46,8 @@ public class Team : AggregateRoot
 
         var team = new Team(id, name.Trim(), description?.Trim());
         team._members.Add(new TeamMember(ownerId, TeamRole.Owner, DateTime.UtcNow));
+        for (var i = 0; i < DefaultColumns.Length; i++)
+            team._columns.Add(new BoardColumn(DefaultColumns[i].Key, DefaultColumns[i].Name, i));
         team.RaiseDomainEvent(new TeamCreatedEvent(team.Id, ownerId));
 
         return team;
@@ -53,13 +63,22 @@ public class Team : AggregateRoot
     public static Team Rehydrate(
         string id, string name, string? description, IEnumerable<TeamMember> members,
         IEnumerable<Label>? labels = null, IEnumerable<ColumnWipLimit>? wipLimits = null,
-        IEnumerable<StoryTemplate>? templates = null)
+        IEnumerable<StoryTemplate>? templates = null, IEnumerable<BoardColumn>? columns = null)
     {
         var team = new Team(id, name, description);
         team._members.AddRange(members);
         if (labels is not null) team._labels.AddRange(labels);
         if (wipLimits is not null) team._wipLimits.AddRange(wipLimits);
         if (templates is not null) team._templates.AddRange(templates);
+        // Older teams persisted before this feature existed have no saved
+        // columns — seed the same six defaults on the fly rather than
+        // migrating every existing document, so their board keeps working
+        // exactly as before until someone customizes it.
+        if (columns is not null && columns.Any())
+            team._columns.AddRange(columns);
+        else
+            for (var i = 0; i < DefaultColumns.Length; i++)
+                team._columns.Add(new BoardColumn(DefaultColumns[i].Key, DefaultColumns[i].Name, i));
         return team;
     }
 
@@ -178,6 +197,79 @@ public class Team : AggregateRoot
             ?? throw new KeyNotFoundException("Label not found.");
 
         _labels.Remove(label);
+    }
+
+    // --- Board columns ---
+
+    public BoardColumn AddColumn(string name, string requestingUserId)
+    {
+        EnsureIsOwner(requestingUserId);
+
+        if (string.IsNullOrWhiteSpace(name))
+            throw new ArgumentException("Column name is required.", nameof(name));
+
+        if (_columns.Any(c => string.Equals(c.Name, name.Trim(), StringComparison.OrdinalIgnoreCase)))
+            throw new InvalidOperationException($"A column named \"{name}\" already exists on this board.");
+
+        // Custom_ prefix (vs. the bare ToDo/Analyze/... keys the six seeded
+        // columns use) is what RemoveColumn checks to tell a removable,
+        // team-added column apart from a protected default one.
+        var key = "Custom_" + Guid.NewGuid().ToString("N")[..8];
+        var column = new BoardColumn(key, name.Trim(), _columns.Count);
+        _columns.Add(column);
+        return column;
+    }
+
+    public void RenameColumn(string key, string name, string requestingUserId)
+    {
+        EnsureIsOwner(requestingUserId);
+
+        if (string.IsNullOrWhiteSpace(name))
+            throw new ArgumentException("Column name is required.", nameof(name));
+
+        var column = _columns.FirstOrDefault(c => c.Key == key)
+            ?? throw new KeyNotFoundException("Column not found.");
+
+        if (_columns.Any(c => c.Key != key && string.Equals(c.Name, name.Trim(), StringComparison.OrdinalIgnoreCase)))
+            throw new InvalidOperationException($"A column named \"{name}\" already exists on this board.");
+
+        column.Rename(name.Trim());
+    }
+
+    /// <summary>
+    /// Only a team-added ("Custom_...") column can be removed — the six
+    /// seeded ones (see BoardColumn) stay for the life of the team, since
+    /// several places key specifically off their literal Keys (recurring
+    /// completion and burndown both check for "Done" by name, for example).
+    /// Renaming a default column's label is always fine; deleting it isn't.
+    /// Whether any stories still use this column is Application's concern
+    /// (RemoveBoardColumnCommandHandler checks via IUserStoryRepository,
+    /// which this aggregate deliberately has no access to) — same reasoning
+    /// as DeleteLabel.
+    /// </summary>
+    public void RemoveColumn(string key, string requestingUserId)
+    {
+        EnsureIsOwner(requestingUserId);
+
+        var column = _columns.FirstOrDefault(c => c.Key == key)
+            ?? throw new KeyNotFoundException("Column not found.");
+
+        if (!key.StartsWith("Custom_", StringComparison.Ordinal))
+            throw new InvalidOperationException("The default board columns can be renamed but not removed.");
+
+        _columns.Remove(column);
+    }
+
+    public void ReorderColumns(IReadOnlyList<string> orderedKeys, string requestingUserId)
+    {
+        EnsureIsOwner(requestingUserId);
+
+        if (orderedKeys.Count != _columns.Count || orderedKeys.Distinct().Count() != _columns.Count
+            || orderedKeys.Any(k => _columns.All(c => c.Key != k)))
+            throw new ArgumentException("The reordered list must contain exactly the board's current columns, each once.", nameof(orderedKeys));
+
+        for (var i = 0; i < orderedKeys.Count; i++)
+            _columns.First(c => c.Key == orderedKeys[i]).SetOrder(i);
     }
 
     // --- WIP limits (optional Kanban feature — owner-configurable) ---

@@ -41,7 +41,7 @@ public class CompleteSprintCommandHandler : IRequestHandler<CompleteSprintComman
         // Captured before the rollover below moves anything — this is a
         // snapshot of what was actually Done AT the moment of completion,
         // which is what a team velocity chart plots across sprints.
-        var completedPoints = sprintStories.Where(s => s.Status == UserStoryStatus.Done).Sum(s => s.StoryPoints ?? 0);
+        var completedPoints = sprintStories.Where(s => s.Status == "Done").Sum(s => s.StoryPoints ?? 0);
 
         sprint.Complete(completedPoints);
         await _sprintRepository.UpdateAsync(sprint, cancellationToken);
@@ -49,7 +49,7 @@ public class CompleteSprintCommandHandler : IRequestHandler<CompleteSprintComman
         // Standard Scrum practice: anything not Done when the sprint ends goes
         // back to the backlog (unsprinted) rather than staying attached to a
         // now-closed sprint — it's fair game to be re-planned into the next one.
-        foreach (var story in sprintStories.Where(s => s.Status != UserStoryStatus.Done))
+        foreach (var story in sprintStories.Where(s => s.Status != "Done"))
         {
             story.MoveToSprint(null);
             await _userStoryRepository.UpdateAsync(story, cancellationToken);

@@ -64,8 +64,8 @@ internal static class ImportRowParser
 
             var description = Col(descriptionIndex);
 
-            var status = ResolveMapped(Col(statusIndex), mapping.StatusValueMap, Domain.UserStories.UserStoryStatus.ToDo.ToString(),
-                v => Enum.TryParse<Domain.UserStories.UserStoryStatus>(v, ignoreCase: true, out _));
+            var status = ResolveMapped(Col(statusIndex), mapping.StatusValueMap, "ToDo",
+                v => !string.IsNullOrWhiteSpace(v)); // real validity check (does this column exist on the team?) happens in UserStoryRowApplier, which has access to Team.Columns
             var priority = ResolveMapped(Col(priorityIndex), mapping.PriorityValueMap, Domain.UserStories.UserStoryPriority.Medium.ToString(),
                 v => Enum.TryParse<Domain.UserStories.UserStoryPriority>(v, ignoreCase: true, out _));
 

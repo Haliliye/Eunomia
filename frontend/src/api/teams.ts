@@ -1,5 +1,5 @@
 import { apiClient } from './client'
-import type { Team, Label, StoryTemplate } from '@/types/team'
+import type { Team, Label, StoryTemplate, BoardColumn } from '@/types/team'
 import type { PagedResult } from '@/types/paged'
 import type { Activity } from '@/types/activity'
 
@@ -41,6 +41,18 @@ export const teamsApi = {
 
   setWipLimit: (teamId: string, status: string, limit: number | null) =>
     apiClient.put(`/teams/${teamId}/wip-limits/${status}`, { limit }),
+
+  addColumn: (teamId: string, name: string) =>
+    apiClient.post<BoardColumn>(`/teams/${teamId}/columns`, { name }).then((res) => res.data),
+
+  renameColumn: (teamId: string, columnKey: string, name: string) =>
+    apiClient.put(`/teams/${teamId}/columns/${columnKey}`, { name }),
+
+  removeColumn: (teamId: string, columnKey: string) =>
+    apiClient.delete(`/teams/${teamId}/columns/${columnKey}`),
+
+  reorderColumns: (teamId: string, orderedColumnKeys: string[]) =>
+    apiClient.put(`/teams/${teamId}/columns/order`, { orderedColumnKeys }),
 
   createTemplate: (teamId: string, name: string, defaultDescription: string | undefined, defaultPriority: string | undefined, checklistItemTexts: string[]) =>
     apiClient.post<StoryTemplate>(`/teams/${teamId}/templates`, { name, defaultDescription, defaultPriority, checklistItemTexts }).then((res) => res.data),

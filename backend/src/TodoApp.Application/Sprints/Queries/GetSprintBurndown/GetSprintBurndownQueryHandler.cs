@@ -35,7 +35,7 @@ public class GetSprintBurndownQueryHandler : IRequestHandler<GetSprintBurndownQu
                 sprint.TeamId, status: null, priority: null, assigneeId: null, keyword: null,
                 page: 1, pageSize: 500, showArchived: false, sprintId: sprint.Id, cancellationToken: cancellationToken);
 
-            var remaining = stories.Where(s => s.Status != UserStoryStatus.Done).ToList();
+            var remaining = stories.Where(s => s.Status != "Done").ToList();
             var remainingCount = remaining.Count;
             var remainingPoints = remaining.Sum(s => s.StoryPoints ?? 0);
 

@@ -4,6 +4,7 @@ public record TeamMemberDto(string UserId, string Role, DateTime JoinedOn);
 public record LabelDto(string Id, string Name, string Color);
 public record ColumnWipLimitDto(string Status, int Limit);
 public record StoryTemplateDto(string Id, string Name, string? DefaultDescription, string? DefaultPriority, IReadOnlyList<string> ChecklistItemTexts);
+public record BoardColumnDto(string Key, string Name, int Order);
 
 public record TeamDto(
     string Id,
@@ -12,4 +13,5 @@ public record TeamDto(
     IReadOnlyCollection<TeamMemberDto> Members,
     IReadOnlyCollection<LabelDto> Labels,
     IReadOnlyCollection<ColumnWipLimitDto> WipLimits,
-    IReadOnlyCollection<StoryTemplateDto> Templates);
+    IReadOnlyCollection<StoryTemplateDto> Templates,
+    IReadOnlyList<BoardColumnDto> Columns);

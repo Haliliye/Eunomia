@@ -25,6 +25,12 @@ export interface StoryTemplate {
   checklistItemTexts: string[]
 }
 
+export interface BoardColumn {
+  key: string
+  name: string
+  order: number
+}
+
 export interface Team {
   id: string
   name: string
@@ -33,6 +39,7 @@ export interface Team {
   labels: Label[]
   wipLimits: WipLimit[]
   templates: StoryTemplate[]
+  columns: BoardColumn[]
 }
 
 export interface CreateTeamRequest {

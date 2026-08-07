@@ -79,7 +79,8 @@ public class TeamRepository : ITeamRepository
         {
             Id = t.Id, Name = t.Name, DefaultDescription = t.DefaultDescription, DefaultPriority = t.DefaultPriority,
             ChecklistItemTexts = t.ChecklistItemTexts.ToList()
-        }).ToList()
+        }).ToList(),
+        Columns = team.Columns.Select(c => new BoardColumnDocument { Key = c.Key, Name = c.Name, Order = c.Order }).ToList()
     };
 
     private static Team ToDomain(TeamDocument document) => Team.Rehydrate(
@@ -89,5 +90,6 @@ public class TeamRepository : ITeamRepository
         document.Members.Select(m => new TeamMember(m.UserId, Enum.Parse<TeamRole>(m.Role), m.JoinedOn)),
         document.Labels.Select(l => new Label(l.Id, l.Name, l.Color)),
         document.WipLimits.Select(w => new ColumnWipLimit(w.Status, w.Limit)),
-        document.Templates.Select(t => new StoryTemplate(t.Id, t.Name, t.DefaultDescription, t.DefaultPriority, t.ChecklistItemTexts)));
+        document.Templates.Select(t => new StoryTemplate(t.Id, t.Name, t.DefaultDescription, t.DefaultPriority, t.ChecklistItemTexts)),
+        document.Columns.Select(c => new BoardColumn(c.Key, c.Name, c.Order)));
 }

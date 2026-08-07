@@ -3,6 +3,7 @@ import { useOutletContext } from 'react-router-dom'
 import { DndContext, closestCenter, useSensor, useSensors, PointerSensor, TouchSensor, type DragEndEvent } from '@dnd-kit/core'
 import { userStoriesApi } from '@/api/userStories'
 import { sprintsApi } from '@/api/sprints'
+import { teamsApi } from '@/api/teams'
 import { boardsApi, type Board } from '@/api/boards'
 import BoardTabs from '@/components/board/BoardTabs'
 import type { UserStory, UserStoryStatus } from '@/types/userStory'
@@ -16,17 +17,8 @@ import { useUserNames } from '@/hooks/useUserNames'
 import { useToast } from '@/context/ToastContext'
 import type { TeamOutletContext } from './TeamShellPage'
 
-const COLUMNS: { status: UserStoryStatus; title: string }[] = [
-  { status: 'ToDo', title: 'To Do' },
-  { status: 'Analyze', title: 'Analyze' },
-  { status: 'Dev', title: 'Dev' },
-  { status: 'Test', title: 'Test' },
-  { status: 'Debug', title: 'Debug' },
-  { status: 'Done', title: 'Done' },
-]
-
 export default function BoardPage() {
-  const { team } = useOutletContext<TeamOutletContext>()
+  const { team, reloadTeam } = useOutletContext<TeamOutletContext>()
   const { showToast } = useToast()
   const [stories, setStories] = useState<UserStory[]>([])
   const [isLoading, setLoading] = useState(true)
@@ -173,6 +165,36 @@ export default function BoardPage() {
     loadStories()
   }
 
+  const handleRenameColumn = async (columnKey: string, name: string) => {
+    try {
+      await teamsApi.renameColumn(team.id, columnKey, name)
+      reloadTeam()
+    } catch {
+      showToast("Couldn't rename that column.", 'error')
+    }
+  }
+
+  const handleDeleteColumn = async (columnKey: string) => {
+    if (!window.confirm('Delete this column? Any stories still in it need to be moved first.')) return
+    try {
+      await teamsApi.removeColumn(team.id, columnKey)
+      reloadTeam()
+    } catch (err: any) {
+      showToast(err?.response?.data?.error ?? "Couldn't delete that column.", 'error')
+    }
+  }
+
+  const handleAddColumn = async () => {
+    const name = window.prompt('New column name:')
+    if (!name?.trim()) return
+    try {
+      await teamsApi.addColumn(team.id, name.trim())
+      reloadTeam()
+    } catch (err: any) {
+      showToast(err?.response?.data?.error ?? "Couldn't add that column.", 'error')
+    }
+  }
+
   if (isLoading) return <SkeletonBoard />
 
   return (
@@ -208,19 +230,29 @@ export default function BoardPage() {
 
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <div className="board">
-          {COLUMNS.map((col) => (
+          {team.columns.map((col) => (
             <BoardColumn
-              key={col.status}
-              status={col.status}
-              title={col.title}
+              key={col.key}
+              status={col.key}
+              title={col.name}
               teamName={team.name}
               userNames={userNames}
               labels={team.labels}
-              wipLimit={team.wipLimits.find((w) => w.status === col.status)?.limit}
-              stories={visibleStories.filter((s) => s.status === col.status)}
+              wipLimit={team.wipLimits.find((w) => w.status === col.key)?.limit}
+              stories={visibleStories.filter((s) => s.status === col.key)}
               onOpenPanel={setEditingStory}
+              onRename={(name) => handleRenameColumn(col.key, name)}
+              onDelete={() => handleDeleteColumn(col.key)}
+              canDelete={col.key.startsWith('Custom_')}
             />
           ))}
+          <button
+            className="btn btn-ghost"
+            style={{ alignSelf: 'flex-start', minWidth: 140, height: 40 }}
+            onClick={handleAddColumn}
+          >
+            + Add column
+          </button>
         </div>
       </DndContext>
 

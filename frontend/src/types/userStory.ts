@@ -1,4 +1,7 @@
-export type UserStoryStatus = 'ToDo' | 'Analyze' | 'Dev' | 'Test' | 'Debug' | 'Done'
+// Was a fixed union — now a per-team board column Key (see BoardColumn on
+// the backend). The six original values still exist as every team's default
+// columns, but a team can add more, so this can't be a closed union anymore.
+export type UserStoryStatus = string
 export type UserStoryPriority = 'Low' | 'Medium' | 'High' | 'Critical'
 
 export interface ChecklistItem {

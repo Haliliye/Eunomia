@@ -11,5 +11,6 @@ internal static class TeamMapper
         team.Members.Select(m => new TeamMemberDto(m.UserId, m.Role.ToString(), m.JoinedOn)).ToList(),
         team.Labels.Select(l => new LabelDto(l.Id, l.Name, l.Color)).ToList(),
         team.WipLimits.Select(w => new ColumnWipLimitDto(w.Status, w.Limit)).ToList(),
-        team.Templates.Select(t => new StoryTemplateDto(t.Id, t.Name, t.DefaultDescription, t.DefaultPriority, t.ChecklistItemTexts)).ToList());
+        team.Templates.Select(t => new StoryTemplateDto(t.Id, t.Name, t.DefaultDescription, t.DefaultPriority, t.ChecklistItemTexts)).ToList(),
+        team.Columns.Select(c => new BoardColumnDto(c.Key, c.Name, c.Order)).ToList());
 }

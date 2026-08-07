@@ -32,7 +32,7 @@ public class GetStoryLinksQueryHandler : IRequestHandler<GetStoryLinksQuery, IRe
 
             results.Add(new ResolvedStoryLinkDto(
                 linkedStory.Id, linkedStory.Title, linkedStory.TeamId, link.LinkType.ToString(),
-                linkedStory.Status == UserStoryStatus.Done));
+                linkedStory.Status == "Done"));
         }
 
         return results;

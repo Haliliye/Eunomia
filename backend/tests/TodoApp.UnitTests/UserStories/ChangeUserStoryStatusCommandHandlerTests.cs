@@ -40,7 +40,7 @@ public class ChangeUserStoryStatusCommandHandlerTests
         await handler.Handle(command, CancellationToken.None);
 
         // Assert
-        Assert.Equal(UserStoryStatus.Analyze, story.Status);
+        Assert.Equal("Analyze", story.Status);
         repositoryMock.Verify(r => r.UpdateAsync(story, It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -64,7 +64,7 @@ public class ChangeUserStoryStatusCommandHandlerTests
         await handler.Handle(command, CancellationToken.None);
 
         // Assert
-        Assert.Equal(UserStoryStatus.Done, story.Status);
+        Assert.Equal("Done", story.Status);
         repositoryMock.Verify(r => r.UpdateAsync(story, It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -73,9 +73,9 @@ public class ChangeUserStoryStatusCommandHandlerTests
     {
         // Arrange — a failed test sends work to Debug rather than back to ToDo.
         var story = UserStory.Create(Guid.NewGuid().ToString(), TeamId, "Some story", null);
-        story.ChangeStatus(UserStoryStatus.Analyze);
-        story.ChangeStatus(UserStoryStatus.Dev);
-        story.ChangeStatus(UserStoryStatus.Test);
+        story.ChangeStatus("Analyze");
+        story.ChangeStatus("Dev");
+        story.ChangeStatus("Test");
 
         var repositoryMock = new Mock<IUserStoryRepository>();
         repositoryMock.Setup(r => r.GetByIdAsync(story.Id, It.IsAny<CancellationToken>())).ReturnsAsync(story);
@@ -90,7 +90,7 @@ public class ChangeUserStoryStatusCommandHandlerTests
         await handler.Handle(command, CancellationToken.None);
 
         // Assert
-        Assert.Equal(UserStoryStatus.Debug, story.Status);
+        Assert.Equal("Debug", story.Status);
     }
 
     [Fact]
@@ -118,9 +118,9 @@ public class ChangeUserStoryStatusCommandHandlerTests
         var story = UserStory.Create(Guid.NewGuid().ToString(), TeamId, "Water the plants", null);
         story.SetDueDate(new DateTime(2026, 1, 1));
         story.SetRecurrence(RecurrenceFrequency.Daily, null);
-        story.ChangeStatus(UserStoryStatus.Analyze);
-        story.ChangeStatus(UserStoryStatus.Dev);
-        story.ChangeStatus(UserStoryStatus.Test);
+        story.ChangeStatus("Analyze");
+        story.ChangeStatus("Dev");
+        story.ChangeStatus("Test");
 
         var repositoryMock = new Mock<IUserStoryRepository>();
         repositoryMock.Setup(r => r.GetByIdAsync(story.Id, It.IsAny<CancellationToken>())).ReturnsAsync(story);
@@ -151,9 +151,9 @@ public class ChangeUserStoryStatusCommandHandlerTests
     {
         // Arrange
         var story = UserStory.Create(Guid.NewGuid().ToString(), TeamId, "One-off task", null);
-        story.ChangeStatus(UserStoryStatus.Analyze);
-        story.ChangeStatus(UserStoryStatus.Dev);
-        story.ChangeStatus(UserStoryStatus.Test);
+        story.ChangeStatus("Analyze");
+        story.ChangeStatus("Dev");
+        story.ChangeStatus("Test");
 
         var repositoryMock = new Mock<IUserStoryRepository>();
         repositoryMock.Setup(r => r.GetByIdAsync(story.Id, It.IsAny<CancellationToken>())).ReturnsAsync(story);

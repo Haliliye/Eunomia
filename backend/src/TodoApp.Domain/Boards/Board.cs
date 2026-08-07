@@ -5,7 +5,8 @@ namespace TodoApp.Domain.Boards;
 /// <summary>
 /// A named, revisitable Kanban view within a team — the Board page's "which
 /// board am I looking at" concept. The underlying columns are always the
-/// team's fixed workflow statuses (UserStoryStatus); a Board doesn't define
+/// team's board columns (see TodoApp.Domain.Teams.BoardColumn — customizable
+/// per team, but shared across all of a team's Boards); a Board doesn't define
 /// its own columns, it's a saved scope (optionally to one sprint) so someone
 /// can jump straight back to e.g. "Sprint 3 Board" instead of re-applying
 /// the sprint filter every time. Every team implicitly also has an unsaved

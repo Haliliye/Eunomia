@@ -1,19 +1,11 @@
 namespace TodoApp.Domain.UserStories;
 
-/// <summary>
-/// Expanded from the original ToDo/InProgress/Done into a more realistic dev
-/// workflow — "In Progress" was a catch-all that these stages subdivide.
-/// See UserStory.ChangeStatus for the allowed transitions between them.
-/// </summary>
-public enum UserStoryStatus
-{
-    ToDo,
-    Analyze,
-    Dev,
-    Test,
-    Debug,
-    Done
-}
+// The old fixed ToDo/Analyze/Dev/Test/Debug/Done enum was replaced by
+// per-team, customizable board columns (see TodoApp.Domain.Teams.BoardColumn)
+// — UserStory.Status is now a plain string holding a column's Key. The six
+// original values still exist as every team's seeded default columns and
+// their Keys are unchanged, so no data migration was needed; this file is
+// kept only for UserStoryPriority, which is still a fixed enum.
 
 public enum UserStoryPriority
 {

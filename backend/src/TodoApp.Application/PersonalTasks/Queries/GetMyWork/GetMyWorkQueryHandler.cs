@@ -40,7 +40,7 @@ public class GetMyWorkQueryHandler : IRequestHandler<GetMyWorkQuery, IReadOnlyLi
                 teamNameCache[story.TeamId] = teamName;
             }
 
-            items.Add(new MyWorkItemDto(story.Id, story.Title, "TeamStory", story.Status == UserStoryStatus.Done, story.DueDate, story.TeamId, teamName));
+            items.Add(new MyWorkItemDto(story.Id, story.Title, "TeamStory", story.Status == "Done", story.DueDate, story.TeamId, teamName));
         }
 
         // Incomplete items first, then by due date (soonest first, undated last).

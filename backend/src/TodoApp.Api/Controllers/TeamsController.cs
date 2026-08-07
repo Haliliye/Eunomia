@@ -13,6 +13,10 @@ using TodoApp.Application.Teams.Commands.CreateStoryTemplate;
 using TodoApp.Application.Teams.Commands.DeleteStoryTemplate;
 using TodoApp.Application.Teams.Commands.SetColumnWipLimit;
 using TodoApp.Application.Teams.Commands.SetMemberRole;
+using TodoApp.Application.Teams.Commands.AddBoardColumn;
+using TodoApp.Application.Teams.Commands.RenameBoardColumn;
+using TodoApp.Application.Teams.Commands.RemoveBoardColumn;
+using TodoApp.Application.Teams.Commands.ReorderBoardColumns;
 using TodoApp.Application.UserStories.Queries.GetTeamTimeReport;
 using TodoApp.Application.Teams.Commands.UpdateLabel;
 using TodoApp.Application.Teams.Commands.UpdateTeam;
@@ -159,6 +163,34 @@ public class TeamsController : ControllerBase
         return NoContent();
     }
 
+    [HttpPost("{id}/columns")]
+    public async Task<IActionResult> AddColumn(string id, [FromBody] AddBoardColumnRequest request, CancellationToken cancellationToken)
+    {
+        var column = await _mediator.Send(new AddBoardColumnCommand(id, request.Name, User.GetUserId()), cancellationToken);
+        return Ok(column);
+    }
+
+    [HttpPut("{id}/columns/{columnKey}")]
+    public async Task<IActionResult> RenameColumn(string id, string columnKey, [FromBody] RenameBoardColumnRequest request, CancellationToken cancellationToken)
+    {
+        await _mediator.Send(new RenameBoardColumnCommand(id, columnKey, request.Name, User.GetUserId()), cancellationToken);
+        return NoContent();
+    }
+
+    [HttpDelete("{id}/columns/{columnKey}")]
+    public async Task<IActionResult> RemoveColumn(string id, string columnKey, CancellationToken cancellationToken)
+    {
+        await _mediator.Send(new RemoveBoardColumnCommand(id, columnKey, User.GetUserId()), cancellationToken);
+        return NoContent();
+    }
+
+    [HttpPut("{id}/columns/order")]
+    public async Task<IActionResult> ReorderColumns(string id, [FromBody] ReorderBoardColumnsRequest request, CancellationToken cancellationToken)
+    {
+        await _mediator.Send(new ReorderBoardColumnsCommand(id, request.OrderedColumnKeys, User.GetUserId()), cancellationToken);
+        return NoContent();
+    }
+
     [HttpPost("{id}/templates")]
     public async Task<IActionResult> CreateTemplate(string id, [FromBody] CreateStoryTemplateRequest request, CancellationToken cancellationToken)
     {
@@ -178,6 +210,9 @@ public class TeamsController : ControllerBase
 
 public record SetMemberRoleRequest(string Role);
 public record CreateLabelRequest(string Name, string Color);
+public record AddBoardColumnRequest(string Name);
+public record RenameBoardColumnRequest(string Name);
+public record ReorderBoardColumnsRequest(IReadOnlyList<string> OrderedColumnKeys);
 public record UpdateLabelRequest(string Name, string Color);
 public record SetWipLimitRequest(int? Limit);
 public record CreateStoryTemplateRequest(string Name, string? DefaultDescription, string? DefaultPriority, List<string> ChecklistItemTexts);

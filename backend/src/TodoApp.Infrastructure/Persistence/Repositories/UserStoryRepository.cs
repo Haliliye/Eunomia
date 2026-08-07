@@ -171,7 +171,7 @@ public class UserStoryRepository : IUserStoryRepository
         document.TeamId,
         document.Title,
         document.Description,
-        Enum.Parse<UserStoryStatus>(document.Status),
+        document.Status,
         Enum.Parse<UserStoryPriority>(document.Priority),
         document.AssigneeId,
         document.DueDate,
@@ -198,7 +198,7 @@ public class UserStoryRepository : IUserStoryRepository
     {
         var filter = Builders<UserStoryDocument>.Filter.And(
             Builders<UserStoryDocument>.Filter.Eq(s => s.IsArchived, false),
-            Builders<UserStoryDocument>.Filter.Ne(s => s.Status, nameof(UserStoryStatus.Done)),
+            Builders<UserStoryDocument>.Filter.Ne(s => s.Status, "Done"),
             Builders<UserStoryDocument>.Filter.Ne(s => s.DueDate, null),
             Builders<UserStoryDocument>.Filter.Ne(s => s.AssigneeId, null),
             Builders<UserStoryDocument>.Filter.Eq(s => s.ReminderSentOn, null));

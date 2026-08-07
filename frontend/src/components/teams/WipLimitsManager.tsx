@@ -3,14 +3,6 @@ import type { Team } from '@/types/team'
 import { teamsApi } from '@/api/teams'
 import { useToast } from '@/context/ToastContext'
 
-const COLUMNS = [
-  { status: 'ToDo', label: 'To Do' },
-  { status: 'Analyze', label: 'Analyze' },
-  { status: 'Dev', label: 'Dev' },
-  { status: 'Test', label: 'Test' },
-  { status: 'Debug', label: 'Debug' },
-]
-
 interface WipLimitsManagerProps {
   team: Team
   isOwner: boolean
@@ -22,7 +14,7 @@ interface WipLimitsManagerProps {
 export default function WipLimitsManager({ team, isOwner, onChanged }: WipLimitsManagerProps) {
   const { showToast } = useToast()
   const [values, setValues] = useState<Record<string, string>>(() =>
-    Object.fromEntries(COLUMNS.map((c) => [c.status, team.wipLimits.find((w) => w.status === c.status)?.limit.toString() ?? '']))
+    Object.fromEntries(team.columns.map((c) => [c.key, team.wipLimits.find((w) => w.status === c.key)?.limit.toString() ?? '']))
   )
 
   if (!isOwner && team.wipLimits.length === 0) return null
@@ -56,19 +48,19 @@ export default function WipLimitsManager({ team, isOwner, onChanged }: WipLimits
       </p>
 
       {isOwner ? (
-        COLUMNS.map((col) => (
-          <div key={col.status} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-            <label style={{ width: 80, fontSize: 13 }}>{col.label}</label>
+        team.columns.filter((c) => c.key !== 'Done').map((col) => (
+          <div key={col.key} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+            <label style={{ width: 80, fontSize: 13 }}>{col.name}</label>
             <input
               className="input"
               type="number"
               min={1}
               placeholder="No limit"
-              value={values[col.status] ?? ''}
-              onChange={(e) => setValues((prev) => ({ ...prev, [col.status]: e.target.value }))}
+              value={values[col.key] ?? ''}
+              onChange={(e) => setValues((prev) => ({ ...prev, [col.key]: e.target.value }))}
               style={{ maxWidth: 100 }}
             />
-            <button className="btn btn-ghost btn-sm" onClick={() => handleSave(col.status)}>Save</button>
+            <button className="btn btn-ghost btn-sm" onClick={() => handleSave(col.key)}>Save</button>
           </div>
         ))
       ) : (

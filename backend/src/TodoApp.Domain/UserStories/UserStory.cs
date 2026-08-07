@@ -13,7 +13,7 @@ public class UserStory : AggregateRoot
     public string TeamId { get; private set; } = string.Empty;
     public string Title { get; private set; } = string.Empty;
     public string? Description { get; private set; }
-    public UserStoryStatus Status { get; private set; } = UserStoryStatus.ToDo;
+    public string Status { get; private set; } = "ToDo";
     public UserStoryPriority Priority { get; private set; } = UserStoryPriority.Medium;
     public string? AssigneeId { get; private set; }
     public DateTime? DueDate { get; private set; }
@@ -142,7 +142,7 @@ public class UserStory : AggregateRoot
         string teamId,
         string title,
         string? description,
-        UserStoryStatus status,
+        string status,
         UserStoryPriority priority,
         string? assigneeId,
         DateTime? dueDate,
@@ -214,12 +214,19 @@ public class UserStory : AggregateRoot
         Version++;
     }
 
-    public void ChangeStatus(UserStoryStatus newStatus)
+    public void ChangeStatus(string newStatus)
     {
         // Previously restricted to a fixed adjacency graph (ToDo -> Analyze
         // -> Dev -> Test -> Done, with Debug branching off Test); relaxed to
         // allow any-to-any so a board card can be dragged straight to any
         // column instead of only the "next" one in the old workflow graph.
+        // Status is a per-team board column's Key (see BoardColumn) rather
+        // than a fixed enum now — validating that the key actually exists on
+        // this story's team is the caller's job (it needs Team, which this
+        // aggregate doesn't have access to); see ChangeUserStoryStatusCommandHandler.
+        if (string.IsNullOrWhiteSpace(newStatus))
+            throw new ArgumentException("Status is required.", nameof(newStatus));
+
         Status = newStatus;
     }
 

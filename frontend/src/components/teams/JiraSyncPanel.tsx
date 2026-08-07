@@ -19,7 +19,7 @@ export default function JiraSyncPanel({ team }: JiraSyncPanelProps) {
 
   const load = () => integrationsApi.getJiraSyncStatus(team.id).then(setStatus).catch(() => setStatus(null))
 
-  useEffect(load, [team.id])
+  useEffect(() => { load() }, [team.id])
 
   if (!status?.isLinked) return null // not every team came from Jira — nothing to show for the rest
 

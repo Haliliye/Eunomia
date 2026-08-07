@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, Outlet, useLocation, useNavigate, useParams } from 'react-router-dom'
 import NotificationBell from '@/components/notifications/NotificationBell'
+import UserMenu from '@/components/common/UserMenu'
 import CommandPalette from '@/components/common/CommandPalette'
 import { useTheme } from '@/hooks/useTheme'
 import { useAuth } from '@/context/AuthContext'
@@ -121,17 +122,6 @@ export default function Layout() {
             </nav>
           </>
         )}
-
-        <div className="sidebar-footer">
-          <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 2 }}>{user?.displayName}</div>
-          <div className="mono" style={{ fontSize: 11, color: 'var(--color-ink-faint)', marginBottom: 8 }}>
-            {user?.email}
-          </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <Link to="/settings" className="btn btn-ghost btn-sm">Settings</Link>
-            <button className="btn btn-ghost btn-sm" onClick={handleLogout}>Log out</button>
-          </div>
-        </div>
       </aside>
 
       <div className="main-area">
@@ -144,7 +134,10 @@ export default function Layout() {
           >
             {theme === 'light' ? '🌙' : '☀️'}
           </button>
-          <NotificationBell />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <NotificationBell />
+            <UserMenu onLogout={handleLogout} />
+          </div>
         </div>
 
         {user && !user.isEmailVerified && (

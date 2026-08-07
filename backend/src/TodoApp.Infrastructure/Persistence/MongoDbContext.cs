@@ -36,4 +36,5 @@ public class MongoDbContext
     public IMongoCollection<JiraConnectionDocument> JiraConnections => _database.GetCollection<JiraConnectionDocument>("jiraConnections");
     public IMongoCollection<EmailSignupInvitationDocument> EmailSignupInvitations => _database.GetCollection<EmailSignupInvitationDocument>("emailSignupInvitations");
     public IMongoCollection<JiraProjectSyncDocument> JiraProjectSyncs => _database.GetCollection<JiraProjectSyncDocument>("jiraProjectSyncs");
+    public IMongoCollection<BoardDocument> Boards => _database.GetCollection<BoardDocument>("boards");
 }

@@ -50,6 +50,7 @@ public static class DependencyInjection
         services.AddScoped<IJiraConnectionRepository, JiraConnectionRepository>();
         services.AddScoped<IEmailSignupInvitationRepository, EmailSignupInvitationRepository>();
         services.AddScoped<IJiraProjectSyncRepository, JiraProjectSyncRepository>();
+        services.AddScoped<TodoApp.Domain.Boards.IBoardRepository, BoardRepository>();
 
         services.AddSingleton<IPasswordHasher, PasswordHasher>();
         services.AddSingleton<IJwtTokenGenerator, JwtTokenGenerator>();

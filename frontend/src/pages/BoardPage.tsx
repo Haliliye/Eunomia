@@ -3,6 +3,8 @@ import { useOutletContext } from 'react-router-dom'
 import { DndContext, closestCenter, useSensor, useSensors, PointerSensor, TouchSensor, type DragEndEvent } from '@dnd-kit/core'
 import { userStoriesApi } from '@/api/userStories'
 import { sprintsApi } from '@/api/sprints'
+import { boardsApi, type Board } from '@/api/boards'
+import BoardTabs from '@/components/board/BoardTabs'
 import type { UserStory, UserStoryStatus } from '@/types/userStory'
 import type { Sprint } from '@/types/sprint'
 import BoardColumn from '@/components/board/BoardColumn'
@@ -33,6 +35,16 @@ export default function BoardPage() {
   const [editingStory, setEditingStory] = useState<UserStory | null>(null)
   const [sprints, setSprints] = useState<Sprint[]>([])
   const [sprintFilter, setSprintFilter] = useState('')
+  const [boards, setBoards] = useState<Board[]>([])
+  const [selectedBoardId, setSelectedBoardId] = useState<string | null>(null)
+
+  const loadBoards = () => boardsApi.getByTeam(team.id).then(setBoards)
+
+  const handleSelectBoard = (boardId: string | null) => {
+    setSelectedBoardId(boardId)
+    const board = boardId ? boards.find((b) => b.id === boardId) : null
+    setSprintFilter(board?.sprintId ?? '')
+  }
 
   // PointerSensor covers mouse/trackpad; TouchSensor makes cards draggable
   // on touchscreens too (a small delay + tolerance so a tap-to-open doesn't
@@ -70,6 +82,8 @@ export default function BoardPage() {
 
   useEffect(() => {
     sprintsApi.getForTeam(team.id).then(setSprints)
+    loadBoards()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [team.id])
 
   useEffect(() => {
@@ -164,6 +178,15 @@ export default function BoardPage() {
   return (
     <div>
       {error && <div className="alert-error" role="alert">{error}</div>}
+
+      <BoardTabs
+        teamId={team.id}
+        boards={boards}
+        sprints={sprints}
+        selectedBoardId={selectedBoardId}
+        onSelect={handleSelectBoard}
+        onChanged={loadBoards}
+      />
 
       {sprints.length > 0 && (
         <div style={{ marginBottom: 12 }}>

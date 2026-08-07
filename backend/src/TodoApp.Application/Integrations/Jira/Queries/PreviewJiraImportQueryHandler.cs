@@ -20,6 +20,15 @@ public class PreviewJiraImportQueryHandler : IRequestHandler<PreviewJiraImportQu
     {
         var (connection, accessToken) = await _accessTokenProvider.GetValidAccessTokenAsync(request.RequestingUserId, cancellationToken);
         var issues = await _jiraClient.GetIssuesAsync(accessToken, connection.CloudId, request.ProjectKey, cancellationToken);
-        return JiraIssueMapper.MapAndValidate(issues);
+
+        // Preview doesn't touch the database (no team column creation here —
+        // that only happens on the real import, see
+        // JiraProjectImportService.EnsureColumnsForStatuses), so it just
+        // shows each issue's actual Jira status name as-is rather than
+        // pre-resolving it to a column key.
+        var identityStatusMap = issues.Select(i => i.StatusName).Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(s => s, s => s, StringComparer.OrdinalIgnoreCase);
+
+        return JiraIssueMapper.MapAndValidate(issues, identityStatusMap);
     }
 }

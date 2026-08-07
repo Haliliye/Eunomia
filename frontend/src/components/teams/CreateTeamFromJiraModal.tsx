@@ -117,7 +117,8 @@ export default function CreateTeamFromJiraModal({ onClose }: CreateTeamFromJiraM
             </div>
             <p style={{ fontSize: 11.5, color: 'var(--color-ink-faint)', marginTop: 4 }}>
               Every issue in {selectedProject.name} ({selectedProject.key}) will be imported, along with
-              labels, story points, comments, attachments, sprints, and issue links. Assignees with a
+              labels, story points, comments, attachments, sprints, and issue links. The new team's board
+              gets one column per distinct Jira status. Assignees with a
               matching Eunomia account are assigned automatically; others get an email invitation to
               join and are added to this team once they sign up.
             </p>

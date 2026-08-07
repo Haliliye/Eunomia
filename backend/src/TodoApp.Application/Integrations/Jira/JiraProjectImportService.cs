@@ -98,26 +98,32 @@ public class JiraProjectImportService
 
         var sprintIdByName = await SyncSprintsAsync(team, accessToken, cloudId, projectKey, cancellationToken);
 
-        var rows = JiraIssueMapper.MapAndValidate(issues);
-
-        // CreateLabel is owner-only (stricter than the owner-or-admin check
-        // callers already did before invoking this), so an admin importing
-        // simply doesn't get missing labels auto-created — the rest of the
-        // import still proceeds, same as when a matching label doesn't exist
-        // at all today. On a brand-new team (CreateTeamFromJiraCommand) the
-        // requesting user is always the owner (just-created it), so this
-        // always applies there.
+        // CreateLabel/AddColumn are owner-only (stricter than the
+        // owner-or-admin check callers already did before invoking this), so
+        // an admin importing simply doesn't get missing labels/columns
+        // auto-created — the rest of the import still proceeds, same as when
+        // a matching label doesn't exist at all today. On a brand-new team
+        // (CreateTeamFromJiraCommand) the requesting user is always the
+        // owner (just-created it), so this always applies there.
         var isOwner = team.Members.Any(m => m.UserId == requestingUserId && m.Role == TeamRole.Owner);
+
+        // Every distinct Jira status becomes (or is matched to) a real board
+        // column — a 9-status Jira workflow gets 9 real Eunomia columns
+        // instead of being squeezed into the six defaults.
+        var columnKeyByStatusName = EnsureColumnsForStatuses(team, issues, isOwner, requestingUserId);
+
+        var rows = JiraIssueMapper.MapAndValidate(issues, columnKeyByStatusName);
+
         var existingLabelNames = team.Labels.Select(l => l.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var missingLabelNames = isOwner
             ? JiraIssueMapper.DistinctLabelNames(issues).Where(name => !existingLabelNames.Contains(name)).ToList()
             : new List<string>();
-        if (missingLabelNames.Count > 0)
-        {
-            foreach (var name in missingLabelNames)
-                team.CreateLabel(Guid.NewGuid().ToString(), name, DefaultLabelColor, requestingUserId);
-            await _teamRepository.UpdateAsync(team, cancellationToken);
-        }
+        foreach (var name in missingLabelNames)
+            team.CreateLabel(Guid.NewGuid().ToString(), name, DefaultLabelColor, requestingUserId);
+
+        // One save for both the new columns and new labels — both just
+        // mutated the same in-memory Team, so a single UpdateAsync covers it.
+        await _teamRepository.UpdateAsync(team, cancellationToken);
 
         var applyResult = await UserStoryRowApplier.ApplyAsync(team, rows, _userStoryRepository, _userRepository, requestingUserId, cancellationToken);
 
@@ -181,6 +187,40 @@ public class JiraProjectImportService
         }
 
         return sprintIdByName;
+    }
+
+    /// <summary>
+    /// Matches every distinct Jira status name on these issues to a real
+    /// board column, creating one (named exactly after the Jira status) for
+    /// any that don't already match an existing column by name — so a
+    /// project with e.g. "Backlog / To Do / In Progress / In Review / QA /
+    /// Blocked / Done" ends up with all seven, not squeezed into the six
+    /// defaults. Matching is case-insensitive so re-running an import (or
+    /// importing a second project into the same team) doesn't create
+    /// duplicate columns for the same status spelled the same way.
+    /// AddColumn is owner-only (see Team.AddColumn) — an admin importing
+    /// falls back to "ToDo" for any status with no existing matching column,
+    /// rather than being blocked entirely.
+    /// </summary>
+    private static Dictionary<string, string> EnsureColumnsForStatuses(Team team, IReadOnlyList<JiraIssueDto> issues, bool isOwner, string requestingUserId)
+    {
+        var keyByStatusName = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var statusName in issues.Select(i => i.StatusName).Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            var existing = team.Columns.FirstOrDefault(c => string.Equals(c.Name, statusName, StringComparison.OrdinalIgnoreCase));
+            if (existing is not null)
+            {
+                keyByStatusName[statusName] = existing.Key;
+                continue;
+            }
+
+            keyByStatusName[statusName] = isOwner
+                ? team.AddColumn(statusName, requestingUserId).Key
+                : "ToDo";
+        }
+
+        return keyByStatusName;
     }
 
     private async Task AssignSprintsAsync(IReadOnlyList<JiraIssueDto> issues, IReadOnlyDictionary<string, string> storyIdByJiraKey, IReadOnlyDictionary<string, string> sprintIdByName, CancellationToken cancellationToken)

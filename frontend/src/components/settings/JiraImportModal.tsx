@@ -124,8 +124,10 @@ export default function JiraImportModal({ onClose }: JiraImportModalProps) {
             )}
             <p style={{ fontSize: 11.5, color: 'var(--color-ink-faint)', marginTop: 8 }}>
               Issues, labels, story points, comments, attachments, sprints, and issue links come
-              along. Assignees are matched by email when they already have a Eunomia account —
-              otherwise they get an email invite to join. Re-importing later updates existing
+              along. Every distinct Jira status becomes a matching board column (a 9-status Jira
+              workflow gets 9 real columns here, not squeezed into a fixed set). Assignees are
+              matched by email when they already have a Eunomia account — otherwise they get an
+              email invite to join. Re-importing later updates existing
               stories instead of duplicating them.
             </p>
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, fontSize: 12.5 }}>

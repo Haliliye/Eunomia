@@ -162,7 +162,8 @@ public class UserStoryRepository : IUserStoryRepository
             .ToList(),
         CreatedByUserId = story.CreatedByUserId,
         ParentId = story.ParentId,
-        JiraIssueKey = story.JiraIssueKey
+        JiraIssueKey = story.JiraIssueKey,
+        EpicId = story.EpicId
     };
 
     private static UserStory ToDomain(UserStoryDocument document) => UserStory.Rehydrate(
@@ -190,7 +191,8 @@ public class UserStoryRepository : IUserStoryRepository
         document.Links.Select(l => new StoryLink(l.LinkedStoryId, Enum.Parse<StoryLinkType>(l.LinkType))),
         document.CreatedByUserId,
         document.ParentId,
-        document.JiraIssueKey);
+        document.JiraIssueKey,
+        document.EpicId);
 
     public async Task<IReadOnlyList<UserStory>> GetPendingReminderCandidatesAsync(CancellationToken cancellationToken = default)
     {

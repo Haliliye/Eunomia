@@ -34,6 +34,7 @@ export default function StoryDetailPage() {
   const [story, setStory] = useState<UserStory | null>(null)
   const [isLoading, setLoading] = useState(true)
   const [isEditing, setEditing] = useState(false)
+  const [epicStory, setEpicStory] = useState<UserStory | null>(null)
   const userNames = useUserNames([...(team?.members.map((m) => m.userId) ?? []), story?.assigneeId, story?.createdByUserId])
 
   const load = () => {
@@ -44,6 +45,11 @@ export default function StoryDetailPage() {
   }
 
   useEffect(load, [teamId, storyId])
+
+  useEffect(() => {
+    if (!story?.epicId) { setEpicStory(null); return }
+    userStoriesApi.getById(story.epicId).then(setEpicStory).catch(() => setEpicStory(null))
+  }, [story?.epicId])
 
   const handleStatusChange = async (status: UserStoryStatus) => {
     if (!story) return
@@ -175,6 +181,14 @@ export default function StoryDetailPage() {
             <div className="card-header"><h3>Details</h3></div>
             <div className="dashboard-metric-row"><span className="dashboard-label">Assignee</span><span>{story.assigneeId ? displayNameOrId(userNames, story.assigneeId) : 'Unassigned'}</span></div>
             <div className="dashboard-metric-row"><span className="dashboard-label">Reporter</span><span>{story.createdByUserId ? displayNameOrId(userNames, story.createdByUserId) : 'Unknown'}</span></div>
+            {story.epicId && (
+              <div className="dashboard-metric-row">
+                <span className="dashboard-label">Epic</span>
+                <Link to={`/teams/${team.id}/stories/${story.epicId}`} style={{ color: 'var(--color-brand)', textDecoration: 'none' }}>
+                  {epicStory ? epicStory.title : ticketCode(team.name, story.epicId)}
+                </Link>
+              </div>
+            )}
             <div className="dashboard-metric-row"><span className="dashboard-label">Priority</span><PriorityBadge priority={story.priority} /></div>
             <div className="dashboard-metric-row"><span className="dashboard-label">Story points</span><span>{story.storyPoints ?? 'Not estimated'}</span></div>
             <div className="dashboard-metric-row"><span className="dashboard-label">Due date</span><span className={isOverdue(story) ? 'backlog-due-date overdue' : undefined}>{story.dueDate ? new Date(story.dueDate).toLocaleDateString() : 'No due date'}</span></div>

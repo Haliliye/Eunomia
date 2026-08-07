@@ -121,4 +121,11 @@ public class IntegrationsController : ControllerBase
     }
 
     public record SetAutoSyncRequest(bool Enabled);
+
+    [HttpPost("teams/{teamId}/sync-now")]
+    public async Task<IActionResult> SyncNow(string teamId, CancellationToken cancellationToken)
+    {
+        var summary = await _mediator.Send(new SyncJiraTeamNowCommand(teamId, User.GetUserId()), cancellationToken);
+        return Ok(summary);
+    }
 }

@@ -6,6 +6,7 @@ import type { Activity } from '@/types/activity'
 import { Skeleton } from '@/components/common/Skeleton'
 import { useUserNames, displayNameOrId, initialsFor } from '@/hooks/useUserNames'
 import { avatarColor } from '@/lib/avatarColor'
+import JiraSyncPanel from '@/components/teams/JiraSyncPanel'
 import type { TeamOutletContext } from './TeamShellPage'
 
 // A quick "how's this team doing" landing page — the first thing you see
@@ -34,6 +35,7 @@ export default function TeamSummaryPage() {
 
   return (
     <div>
+      <JiraSyncPanel team={team} />
       <div className="stat-grid">
         {isLoading ? (
           <>

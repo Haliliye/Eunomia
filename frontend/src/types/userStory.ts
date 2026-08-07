@@ -55,4 +55,5 @@ export interface UserStory {
   createdOn: string
   createdByUserId?: string
   parentId?: string
+  epicId?: string
 }

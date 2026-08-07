@@ -28,5 +28,6 @@ internal static class UserStoryMapper
         story.TotalLoggedHours,
         story.Links.Select(l => new StoryLinkDto(l.LinkedStoryId, l.LinkType.ToString())).ToList(),
         story.CreatedByUserId,
-        story.ParentId);
+        story.ParentId,
+        story.EpicId);
 }

@@ -122,6 +122,7 @@ public class JiraProjectImportService
         var applyResult = await UserStoryRowApplier.ApplyAsync(team, rows, _userStoryRepository, _userRepository, requestingUserId, cancellationToken);
 
         await AssignSprintsAsync(issues, applyResult.StoryIdByJiraKey, sprintIdByName, cancellationToken);
+        await AssignEpicsAsync(team, issues, applyResult.StoryIdByJiraKey, cancellationToken);
         await ImportLinksAsync(team, issues, applyResult.StoryIdByJiraKey, cancellationToken);
         await ImportCommentsAsync(issues, applyResult.StoryIdByJiraKey, requestingUserId, cancellationToken);
         await ImportAttachmentsAsync(issues, applyResult.StoryIdByJiraKey, accessToken, requestingUserId, cancellationToken);
@@ -201,6 +202,47 @@ public class JiraProjectImportService
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to assign story {StoryId} to sprint {SprintId}", storyId, sprintId);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Resolves each issue's Epic Link/parent (see epicIssueKey in
+    /// JiraApiClient) to a Eunomia story id and sets UserStory.EpicId — same
+    /// resolution strategy as ImportLinksAsync (this batch first, then a DB
+    /// lookup for epics imported by an earlier run).
+    /// </summary>
+    private async Task AssignEpicsAsync(Team team, IReadOnlyList<JiraIssueDto> issues, IReadOnlyDictionary<string, string> storyIdByJiraKey, CancellationToken cancellationToken)
+    {
+        var epicKeys = issues.Select(i => i.EpicIssueKey).Where(k => k is not null).Cast<string>().Distinct().ToList();
+        if (epicKeys.Count == 0) return;
+
+        var unresolvedEpicKeys = epicKeys.Where(k => !storyIdByJiraKey.ContainsKey(k)).ToList();
+        var resolvedFromDb = unresolvedEpicKeys.Count > 0
+            ? (await _userStoryRepository.GetByJiraIssueKeysAsync(team.Id, unresolvedEpicKeys, cancellationToken))
+                .Where(s => s.JiraIssueKey is not null)
+                .ToDictionary(s => s.JiraIssueKey!, s => s.Id)
+            : new Dictionary<string, string>();
+
+        foreach (var issue in issues)
+        {
+            if (issue.EpicIssueKey is null) continue;
+            if (!storyIdByJiraKey.TryGetValue(issue.Key, out var storyId)) continue;
+
+            var epicStoryId = storyIdByJiraKey.TryGetValue(issue.EpicIssueKey, out var id) ? id : resolvedFromDb.GetValueOrDefault(issue.EpicIssueKey);
+            if (epicStoryId is null || epicStoryId == storyId) continue; // epic not (yet) imported, or a self-reference — skip rather than guess
+
+            try
+            {
+                var story = await _userStoryRepository.GetByIdAsync(storyId, cancellationToken);
+                if (story is null || story.EpicId == epicStoryId) continue;
+
+                story.SetEpic(epicStoryId);
+                await _userStoryRepository.UpdateAsync(story, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to set epic on story {StoryId} (Jira issue {IssueKey})", storyId, issue.Key);
             }
         }
     }

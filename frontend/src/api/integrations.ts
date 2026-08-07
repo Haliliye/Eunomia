@@ -52,4 +52,7 @@ export const integrationsApi = {
 
   setJiraAutoSync: (teamId: string, enabled: boolean) =>
     apiClient.put(`/integrations/jira/teams/${teamId}/auto-sync`, { enabled }),
+
+  syncJiraTeamNow: (teamId: string) =>
+    apiClient.post<ImportSummary>(`/integrations/jira/teams/${teamId}/sync-now`).then((res) => res.data),
 }

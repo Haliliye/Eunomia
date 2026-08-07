@@ -152,10 +152,12 @@ public class JiraApiClient : IJiraClient
 
         var storyPointsFieldId = await FindFieldIdAsync(accessToken, cloudId, "story point", cancellationToken);
         var sprintFieldId = await FindFieldIdAsync(accessToken, cloudId, "sprint", cancellationToken);
+        var epicLinkFieldId = await FindFieldIdAsync(accessToken, cloudId, "epic link", cancellationToken);
 
-        var requestedFields = new List<string> { "summary", "description", "status", "priority", "duedate", "labels", "assignee", "issuelinks", "comment", "attachment" };
+        var requestedFields = new List<string> { "summary", "description", "status", "priority", "duedate", "labels", "assignee", "issuelinks", "comment", "attachment", "parent" };
         if (storyPointsFieldId is not null) requestedFields.Add(storyPointsFieldId);
         if (sprintFieldId is not null) requestedFields.Add(sprintFieldId);
+        if (epicLinkFieldId is not null) requestedFields.Add(epicLinkFieldId);
 
         for (var page = 0; page < maxPages; page++)
         {
@@ -232,6 +234,21 @@ public class JiraApiClient : IJiraClient
                     .Select(a => new JiraAttachmentDto(a.Filename, a.MimeType, a.Size, a.Content))
                     .ToList();
 
+                // "Epic Link" (company-managed/classic projects) is a custom
+                // field holding the epic's plain issue key as a string;
+                // team-managed (next-gen) projects instead use the built-in
+                // "parent" field, an object with its own key. Checking both
+                // covers the two Jira project flavors without needing to
+                // know in advance which one this site uses.
+                string? epicIssueKey = null;
+                if (epicLinkFieldId is not null
+                    && issue.Fields.ExtraFields.TryGetValue(epicLinkFieldId, out var rawEpicLink)
+                    && rawEpicLink.ValueKind is JsonValueKind.String)
+                {
+                    epicIssueKey = rawEpicLink.GetString();
+                }
+                epicIssueKey ??= issue.Fields.Parent?.Key;
+
                 results.Add(new JiraIssueDto(
                     issue.Key,
                     issue.Fields.Summary,
@@ -245,7 +262,8 @@ public class JiraApiClient : IJiraClient
                     links,
                     comments,
                     attachments,
-                    sprintName));
+                    sprintName,
+                    epicIssueKey));
             }
 
             if (string.IsNullOrEmpty(searchPage.NextPageToken) || searchPage.Issues.Count == 0) break;
@@ -358,7 +376,8 @@ public class JiraApiClient : IJiraClient
         IssueAssignee? Assignee,
         [property: JsonPropertyName("issuelinks")] List<IssueLink>? IssueLinks,
         IssueCommentField? Comment,
-        List<IssueAttachment>? Attachment)
+        List<IssueAttachment>? Attachment,
+        IssueParentRef? Parent)
     {
         // Catches custom fields we asked for (like story points/sprint) but
         // didn't give a strongly-typed property — their key (e.g.
@@ -394,6 +413,12 @@ public class JiraApiClient : IJiraClient
     private record IssueCommentAuthor([property: JsonPropertyName("emailAddress")] string? EmailAddress, [property: JsonPropertyName("displayName")] string? DisplayName);
 
     private record IssueAttachment(string Filename, [property: JsonPropertyName("mimeType")] string MimeType, long Size, string Content);
+
+    // Same shape Jira uses for a subtask's parent story AND (on team-managed
+    // projects only) a story's parent epic — we only ever read this as a
+    // fallback for the epic case (see epicIssueKey resolution above); our
+    // own subtask hierarchy is independent of Jira's and never touches this.
+    private record IssueParentRef(string Key);
 
     private record BoardPageResponse(List<BoardResponse> Values);
 

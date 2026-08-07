@@ -28,4 +28,5 @@ public record UserStoryDto(
     double TotalLoggedHours,
     IReadOnlyList<StoryLinkDto> Links,
     string? CreatedByUserId,
-    string? ParentId);
+    string? ParentId,
+    string? EpicId);

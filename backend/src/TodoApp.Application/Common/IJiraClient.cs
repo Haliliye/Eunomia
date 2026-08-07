@@ -52,7 +52,8 @@ public record JiraIssueDto(
     IReadOnlyList<JiraIssueLinkDto> Links,
     IReadOnlyList<JiraCommentDto> Comments,
     IReadOnlyList<JiraAttachmentDto> Attachments,
-    string? SprintName);
+    string? SprintName,
+    string? EpicIssueKey);
 
 /// <summary>One side of a Jira issue link — TargetIssueKey is the *other* issue, LinkTypeRaw is Jira's own phrase for the relationship (e.g. "blocks", "is blocked by", "relates to"), mapped to our StoryLinkType in JiraIssueMapper since Jira's vocabulary is effectively unbounded (apps can add custom link types).</summary>
 public record JiraIssueLinkDto(string TargetIssueKey, string LinkTypeRaw);

@@ -34,6 +34,7 @@ public class UserStoryDocument
     public string? CreatedByUserId { get; set; }
     public string? ParentId { get; set; }
     public string? JiraIssueKey { get; set; }
+    public string? EpicId { get; set; }
 }
 
 public class StoryLinkDocument

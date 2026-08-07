@@ -97,6 +97,17 @@ public class UserStory : AggregateRoot
     /// <summary>The Jira issue key (e.g. "KAN-3") this story was imported from — null for stories created directly in Eunomia. Lets re-importing the same project update existing stories instead of creating duplicates; see UserStoryRowApplier.</summary>
     public string? JiraIssueKey { get; private set; }
 
+    /// <summary>
+    /// References another UserStory's Id — that story is this one's Epic.
+    /// Unlike ParentId (subtasks), an epic link never hides a story from the
+    /// normal backlog/board (SearchAsync doesn't filter on this) — a story
+    /// under an epic is still an ordinary top-level backlog item, just
+    /// grouped under a bigger piece of work. The epic itself is just another
+    /// ordinary UserStory (Eunomia has no separate "Epic" type), so this can
+    /// point at any story, imported from Jira or not.
+    /// </summary>
+    public string? EpicId { get; private set; }
+
     private UserStory() { }
 
     private UserStory(string id, string teamId, string title, string? description) : base(id)
@@ -151,7 +162,8 @@ public class UserStory : AggregateRoot
         IEnumerable<StoryLink>? links = null,
         string? createdByUserId = null,
         string? parentId = null,
-        string? jiraIssueKey = null)
+        string? jiraIssueKey = null,
+        string? epicId = null)
     {
         var story = new UserStory(id, teamId, title, description)
         {
@@ -170,7 +182,8 @@ public class UserStory : AggregateRoot
             EstimatedHours = estimatedHours,
             CreatedByUserId = createdByUserId,
             ParentId = parentId,
-            JiraIssueKey = jiraIssueKey
+            JiraIssueKey = jiraIssueKey,
+            EpicId = epicId
         };
 
         if (links is not null)
@@ -246,6 +259,14 @@ public class UserStory : AggregateRoot
 
     /// <summary>Assigns this story to a sprint, or back to the backlog if sprintId is null.</summary>
     public void MoveToSprint(string? sprintId) => SprintId = sprintId;
+
+    public void SetEpic(string? epicId)
+    {
+        if (epicId == Id)
+            throw new ArgumentException("A story can't be its own epic.", nameof(epicId));
+
+        EpicId = epicId;
+    }
 
     // --- Checklist (US-122/123/124) ---
 

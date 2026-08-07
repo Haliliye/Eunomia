@@ -412,6 +412,14 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; }
   border-color: var(--color-brand);
 }
 
+/* Native <option> elements render via the OS/browser, not this stylesheet —
+   without this they stay white-background/dark-text regardless of our dark
+   theme, making the dropdown list unreadable against a dark page. */
+select option {
+  background: var(--color-surface);
+  color: var(--color-ink);
+}
+
 .textarea { resize: vertical; min-height: 72px; }
 
 .field-error {

@@ -202,7 +202,10 @@ export default function BoardPage() {
   }
 
   const handleDeleteColumn = async (columnKey: string) => {
-    if (!window.confirm('Delete this column? Any stories still in it need to be moved first.')) return
+    const warning = columnKey === 'Done'
+      ? 'Delete this column? Any stories still in it need to be moved first. This is also your "Done" column — removing it means sprint burndown, velocity, and the dashboard\'s open/closed split will no longer recognize any story as complete.'
+      : 'Delete this column? Any stories still in it need to be moved first.'
+    if (!window.confirm(warning)) return
     try {
       await teamsApi.removeColumn(team.id, columnKey)
       reloadTeam()
@@ -271,7 +274,7 @@ export default function BoardPage() {
                 onOpenPanel={setEditingStory}
                 onRename={(name) => handleRenameColumn(col.key, name)}
                 onDelete={() => handleDeleteColumn(col.key)}
-                canDelete={col.key.startsWith('Custom_')}
+                canDelete={team.columns.length > 1}
               />
             ))}
           </SortableContext>

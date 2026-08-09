@@ -237,15 +237,16 @@ public class Team : AggregateRoot
     }
 
     /// <summary>
-    /// Only a team-added ("Custom_...") column can be removed — the six
-    /// seeded ones (see BoardColumn) stay for the life of the team, since
-    /// several places key specifically off their literal Keys (recurring
-    /// completion and burndown both check for "Done" by name, for example).
-    /// Renaming a default column's label is always fine; deleting it isn't.
-    /// Whether any stories still use this column is Application's concern
-    /// (RemoveBoardColumnCommandHandler checks via IUserStoryRepository,
-    /// which this aggregate deliberately has no access to) — same reasoning
-    /// as DeleteLabel.
+    /// Any column — including the six seeded defaults — can be removed now
+    /// (whether stories currently sit in it is Application's concern; see
+    /// RemoveBoardColumnCommandHandler, which this aggregate deliberately
+    /// has no access to check). The one thing still enforced here is that a
+    /// team always has at least one column, since a story with no status at
+    /// all doesn't make sense in this model. Removing the "Done" column (or
+    /// relabeling it and adding a new one instead) means sprint burndown,
+    /// velocity, and the dashboard's open/closed split simply never see any
+    /// story as complete — a real trade-off, not a bug, that a team is
+    /// choosing when it deletes that column.
     /// </summary>
     public void RemoveColumn(string key, string requestingUserId)
     {
@@ -254,8 +255,8 @@ public class Team : AggregateRoot
         var column = _columns.FirstOrDefault(c => c.Key == key)
             ?? throw new KeyNotFoundException("Column not found.");
 
-        if (!key.StartsWith("Custom_", StringComparison.Ordinal))
-            throw new InvalidOperationException("The default board columns can be renamed but not removed.");
+        if (_columns.Count <= 1)
+            throw new InvalidOperationException("A team needs at least one board column.");
 
         _columns.Remove(column);
     }

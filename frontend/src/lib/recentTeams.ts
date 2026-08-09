@@ -29,3 +29,11 @@ export function recordRecentTeam(userId: string, teamId: string, teamName: strin
   const next = [{ id: teamId, name: teamName }, ...existing].slice(0, MAX_RECENT)
   localStorage.setItem(storageKey(userId), JSON.stringify(next))
 }
+
+// Called after a team is deleted — otherwise it lingers in the sidebar's
+// Recent list (a separate, unrelated cache) pointing at a team that no
+// longer exists.
+export function removeRecentTeam(userId: string, teamId: string) {
+  const next = getRecentTeams(userId).filter((t) => t.id !== teamId)
+  localStorage.setItem(storageKey(userId), JSON.stringify(next))
+}

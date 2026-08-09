@@ -8,11 +8,14 @@ import PendingInvitations from '@/components/teams/PendingInvitations'
 import ConfirmDeleteModal from '@/components/common/ConfirmDeleteModal'
 import { SkeletonTeamGrid } from '@/components/common/Skeleton'
 import { useToast } from '@/context/ToastContext'
+import { useAuth } from '@/context/AuthContext'
+import { removeRecentTeam } from '@/lib/recentTeams'
 
 const PAGE_SIZE = 25
 
 export default function TeamsPage() {
   const { showToast } = useToast()
+  const { user } = useAuth()
   const [teams, setTeams] = useState<Team[]>([])
   const [totalCount, setTotalCount] = useState(0)
   const [page, setPage] = useState(1)
@@ -49,6 +52,7 @@ export default function TeamsPage() {
 
     try {
       await teamsApi.delete(team.id)
+      if (user) removeRecentTeam(user.userId, team.id)
       load(page)
       setError(null)
       showToast(`"${team.name}" was deleted.`)

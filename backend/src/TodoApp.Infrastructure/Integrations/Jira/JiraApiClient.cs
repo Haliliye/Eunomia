@@ -37,7 +37,17 @@ public class JiraApiClient : IJiraClient
     // propagation delay for a freshly created OAuth app) rather than
     // anything wrong with this request. If it recurs, retry rather than
     // assume the scope/params are at fault.
-    private const string Scopes = "read:jira-work read:jira-user offline_access";
+    // read:jira-work/read:jira-user are classic scopes (issues, comments,
+    // attachments, projects, users — everything else in this file). The
+    // Jira Agile REST API (boards/sprints/board configuration) sits behind
+    // Atlassian's separate granular scope system instead and 401s with
+    // "scope does not match" for classic-only apps regardless of which
+    // classic scope is requested — read:board-scope:jira-software and
+    // read:sprint:jira-software are what GetSprintsAsync/GetBoardStatusOrderAsync
+    // actually need. Mixing classic and granular scopes in one app/token is
+    // supported by Atlassian, so both sets are requested together here
+    // rather than migrating everything to granular.
+    private const string Scopes = "read:jira-work read:jira-user offline_access read:board-scope:jira-software read:board-scope.admin:jira-software read:sprint:jira-software";
 
     private readonly HttpClient _httpClient;
     private readonly JiraSettings _settings;

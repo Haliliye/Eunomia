@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useDroppable } from '@dnd-kit/core'
+import { useSortable } from '@dnd-kit/sortable'
 import type { UserStory, UserStoryStatus } from '@/types/userStory'
 import type { Label } from '@/types/team'
 import StoryCard from './StoryCard'
@@ -19,7 +20,12 @@ interface BoardColumnProps {
 }
 
 export default function BoardColumn({ status, title, stories, teamName, userNames, labels, wipLimit, onOpenPanel, onRename, onDelete, canDelete }: BoardColumnProps) {
-  const { setNodeRef, isOver } = useDroppable({ id: status })
+  const { setNodeRef: setDropRef, isOver } = useDroppable({ id: status })
+  // A separate sortable id namespace (column:<key>) from the droppable id
+  // (<key>, used for dropping story cards into this column) — dragging the
+  // handle reorders columns; dropping a card on the column body still moves
+  // that story into this status, the two gestures don't interfere.
+  const { attributes, listeners, setNodeRef: setSortableRef, transform, transition, isDragging } = useSortable({ id: `column:${status}` })
   const isOverLimit = wipLimit !== undefined && stories.length > wipLimit
   const [isEditing, setEditing] = useState(false)
   const [name, setName] = useState(title)
@@ -30,9 +36,28 @@ export default function BoardColumn({ status, title, stories, teamName, userName
     else setName(title)
   }
 
+  const style = {
+    transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  }
+
   return (
-    <div ref={setNodeRef} className={`board-column ${isOver ? 'is-over' : ''} ${isOverLimit ? 'is-over-wip-limit' : ''}`}>
+    <div
+      ref={(node) => { setDropRef(node); setSortableRef(node) }}
+      style={style}
+      className={`board-column ${isOver ? 'is-over' : ''} ${isOverLimit ? 'is-over-wip-limit' : ''}`}
+    >
       <div className="board-column-header">
+        <span
+          {...attributes}
+          {...listeners}
+          aria-label="Drag to reorder this column"
+          title="Drag to reorder"
+          style={{ cursor: 'grab', color: 'var(--color-ink-faint)', marginRight: 2, touchAction: 'none' }}
+        >
+          ⠿
+        </span>
         {isEditing ? (
           <input
             className="input"

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { DndContext, closestCenter, useSensor, useSensors, PointerSensor, TouchSensor, type DragEndEvent } from '@dnd-kit/core'
+import { SortableContext, horizontalListSortingStrategy, arrayMove } from '@dnd-kit/sortable'
 import { userStoriesApi } from '@/api/userStories'
 import { sprintsApi } from '@/api/sprints'
 import { teamsApi } from '@/api/teams'
@@ -125,8 +126,34 @@ export default function BoardPage() {
     const { active, over } = event
     if (!over) return
 
-    const storyId = String(active.id)
-    const newStatus = over.id as UserStoryStatus
+    const activeId = String(active.id)
+    const overId = String(over.id)
+
+    // Dragging a column's handle (id "column:<key>") reorders columns —
+    // distinct from dragging a story card (plain story id) onto a column
+    // body (id "<key>") to change its status, handled below.
+    if (activeId.startsWith('column:')) {
+      if (activeId === overId) return
+      const oldIndex = team.columns.findIndex((c) => `column:${c.key}` === activeId)
+      // over.id can resolve to either this column's plain droppable id
+      // (status key, used for story-card drops) or its sortable id
+      // (column:key) — both target the same physical column since the two
+      // hooks share one DOM node, so both forms are accepted here.
+      const newIndex = team.columns.findIndex((c) => `column:${c.key}` === overId || c.key === overId)
+      if (oldIndex === -1 || newIndex === -1) return
+
+      const reordered = arrayMove(team.columns, oldIndex, newIndex)
+      try {
+        await teamsApi.reorderColumns(team.id, reordered.map((c) => c.key))
+        reloadTeam()
+      } catch {
+        showToast("Couldn't reorder columns.", 'error')
+      }
+      return
+    }
+
+    const storyId = activeId
+    const newStatus = overId as UserStoryStatus
     const story = stories.find((s) => s.id === storyId)
     if (!story || story.status === newStatus) return
 
@@ -230,22 +257,24 @@ export default function BoardPage() {
 
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <div className="board">
-          {team.columns.map((col) => (
-            <BoardColumn
-              key={col.key}
-              status={col.key}
-              title={col.name}
-              teamName={team.name}
-              userNames={userNames}
-              labels={team.labels}
-              wipLimit={team.wipLimits.find((w) => w.status === col.key)?.limit}
-              stories={visibleStories.filter((s) => s.status === col.key)}
-              onOpenPanel={setEditingStory}
-              onRename={(name) => handleRenameColumn(col.key, name)}
-              onDelete={() => handleDeleteColumn(col.key)}
-              canDelete={col.key.startsWith('Custom_')}
-            />
-          ))}
+          <SortableContext items={team.columns.map((c) => `column:${c.key}`)} strategy={horizontalListSortingStrategy}>
+            {team.columns.map((col) => (
+              <BoardColumn
+                key={col.key}
+                status={col.key}
+                title={col.name}
+                teamName={team.name}
+                userNames={userNames}
+                labels={team.labels}
+                wipLimit={team.wipLimits.find((w) => w.status === col.key)?.limit}
+                stories={visibleStories.filter((s) => s.status === col.key)}
+                onOpenPanel={setEditingStory}
+                onRename={(name) => handleRenameColumn(col.key, name)}
+                onDelete={() => handleDeleteColumn(col.key)}
+                canDelete={col.key.startsWith('Custom_')}
+              />
+            ))}
+          </SortableContext>
           <button
             className="btn btn-ghost"
             style={{ alignSelf: 'flex-start', minWidth: 140, height: 40 }}

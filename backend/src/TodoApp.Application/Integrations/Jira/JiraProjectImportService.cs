@@ -98,19 +98,19 @@ public class JiraProjectImportService
 
         var sprintIdByName = await SyncSprintsAsync(team, accessToken, cloudId, projectKey, cancellationToken);
 
-        // CreateLabel/AddColumn are owner-only (stricter than the
-        // owner-or-admin check callers already did before invoking this), so
-        // an admin importing simply doesn't get missing labels/columns
-        // auto-created — the rest of the import still proceeds, same as when
-        // a matching label doesn't exist at all today. On a brand-new team
-        // (CreateTeamFromJiraCommand) the requesting user is always the
-        // owner (just-created it), so this always applies there.
         var isOwner = team.Members.Any(m => m.UserId == requestingUserId && m.Role == TeamRole.Owner);
+
+        // Jira's own board tells us the "real" left-to-right status order
+        // (e.g. Backlog, To Do, In Progress, In Review, QA, Done) — falls
+        // back to whatever order issues happen to introduce new statuses in
+        // if the project has no board to read this from (see
+        // GetBoardStatusOrderAsync).
+        var jiraStatusOrder = await _jiraClient.GetBoardStatusOrderAsync(accessToken, cloudId, projectKey, cancellationToken);
 
         // Every distinct Jira status becomes (or is matched to) a real board
         // column — a 9-status Jira workflow gets 9 real Eunomia columns
         // instead of being squeezed into the six defaults.
-        var columnKeyByStatusName = EnsureColumnsForStatuses(team, issues, isOwner, requestingUserId);
+        var columnKeyByStatusName = EnsureColumnsForStatuses(team, issues, jiraStatusOrder, isOwner, requestingUserId);
 
         var rows = JiraIssueMapper.MapAndValidate(issues, columnKeyByStatusName);
 
@@ -121,8 +121,27 @@ public class JiraProjectImportService
         foreach (var name in missingLabelNames)
             team.CreateLabel(Guid.NewGuid().ToString(), name, DefaultLabelColor, requestingUserId);
 
-        // One save for both the new columns and new labels — both just
-        // mutated the same in-memory Team, so a single UpdateAsync covers it.
+        // Reposition every column to match Jira's own board order — not just
+        // the newly created ones, since an existing default column (say,
+        // "Done") should also slot into wherever Jira puts its equivalent
+        // rather than staying wherever it happened to be created. Any
+        // Eunomia-only column with no Jira counterpart (a custom one, or a
+        // default that this Jira project's workflow doesn't use) keeps its
+        // relative position and is placed after all Jira-matched ones.
+        if (isOwner && jiraStatusOrder.Count > 0)
+        {
+            var jiraOrderedKeys = jiraStatusOrder
+                .Select(name => columnKeyByStatusName.GetValueOrDefault(name))
+                .Where(key => key is not null)
+                .Cast<string>()
+                .Distinct()
+                .ToList();
+            var remainingKeys = team.Columns.Select(c => c.Key).Where(k => !jiraOrderedKeys.Contains(k)).ToList();
+            team.ReorderColumns(jiraOrderedKeys.Concat(remainingKeys).ToList(), requestingUserId);
+        }
+
+        // One save for the new columns, new labels, and reordering — all
+        // just mutated the same in-memory Team, so a single UpdateAsync covers it.
         await _teamRepository.UpdateAsync(team, cancellationToken);
 
         var applyResult = await UserStoryRowApplier.ApplyAsync(team, rows, _userStoryRepository, _userRepository, requestingUserId, cancellationToken);
@@ -198,15 +217,31 @@ public class JiraProjectImportService
     /// defaults. Matching is case-insensitive so re-running an import (or
     /// importing a second project into the same team) doesn't create
     /// duplicate columns for the same status spelled the same way.
+    /// New columns are created walking jiraStatusOrder (Jira's own board
+    /// order) rather than issues' encounter order, purely so that if two new
+    /// columns are created in the same call they land in the right order
+    /// *relative to each other* — ImportAsync's ReorderColumns pass right
+    /// after this is what actually places everything (new and pre-existing)
+    /// into Jira's full order, including past the default columns.
     /// AddColumn is owner-only (see Team.AddColumn) — an admin importing
     /// falls back to "ToDo" for any status with no existing matching column,
     /// rather than being blocked entirely.
     /// </summary>
-    private static Dictionary<string, string> EnsureColumnsForStatuses(Team team, IReadOnlyList<JiraIssueDto> issues, bool isOwner, string requestingUserId)
+    private static Dictionary<string, string> EnsureColumnsForStatuses(Team team, IReadOnlyList<JiraIssueDto> issues, IReadOnlyList<string> jiraStatusOrder, bool isOwner, string requestingUserId)
     {
+        var distinctStatusNames = issues.Select(i => i.StatusName).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        // Walk Jira's board order first (covers most statuses in the right
+        // relative sequence), then anything left over (a status that exists
+        // on issues but wasn't on the board's column config, e.g. a status
+        // no longer wired to a column) in whatever order it was encountered.
+        var orderedStatusNames = jiraStatusOrder
+            .Where(name => distinctStatusNames.Contains(name, StringComparer.OrdinalIgnoreCase))
+            .Concat(distinctStatusNames.Where(name => !jiraStatusOrder.Contains(name, StringComparer.OrdinalIgnoreCase)))
+            .ToList();
+
         var keyByStatusName = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var statusName in issues.Select(i => i.StatusName).Distinct(StringComparer.OrdinalIgnoreCase))
+        foreach (var statusName in orderedStatusNames)
         {
             var existing = team.Columns.FirstOrDefault(c => string.Equals(c.Name, statusName, StringComparison.OrdinalIgnoreCase));
             if (existing is not null)

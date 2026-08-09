@@ -31,6 +31,9 @@ public interface IJiraClient
 
     /// <summary>Every sprint (any state) on the Scrum board(s) attached to this project — see JiraApiClient for why a board lookup has to happen first. Empty for Kanban-only or team-managed projects with no Scrum board.</summary>
     Task<IReadOnlyList<JiraSprintDto>> GetSprintsAsync(string accessToken, string cloudId, string projectKey, CancellationToken cancellationToken = default);
+
+    /// <summary>The left-to-right status order from the project's Jira board (Scrum or Kanban) — empty if there's no board to read it from, in which case the caller falls back to encounter order.</summary>
+    Task<IReadOnlyList<string>> GetBoardStatusOrderAsync(string accessToken, string cloudId, string projectKey, CancellationToken cancellationToken = default);
 }
 
 public record JiraTokenResult(string AccessToken, string RefreshToken, DateTime ExpiresOn);

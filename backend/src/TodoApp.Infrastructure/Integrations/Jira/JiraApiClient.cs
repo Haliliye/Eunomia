@@ -317,20 +317,25 @@ public class JiraApiClient : IJiraClient
         return await response.Content.ReadAsStreamAsync(cancellationToken);
     }
 
+    private async Task<List<BoardResponse>> FindBoardsAsync(string accessToken, string cloudId, string projectKey, CancellationToken cancellationToken)
+    {
+        using var boardRequest = new HttpRequestMessage(HttpMethod.Get, $"{ApiBaseUrl}/ex/jira/{cloudId}/rest/agile/1.0/board?projectKeyOrId={Uri.EscapeDataString(projectKey)}");
+        boardRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        using var boardResponse = await _httpClient.SendAsync(boardRequest, cancellationToken);
+        if (!boardResponse.IsSuccessStatusCode) return new List<BoardResponse>(); // no Agile access / no boards — not fatal, sprints/column-order are both optional
+
+        var boardPage = await boardResponse.Content.ReadFromJsonAsync<BoardPageResponse>(JsonOptions, cancellationToken);
+        return boardPage?.Values ?? new();
+    }
+
     public async Task<IReadOnlyList<JiraSprintDto>> GetSprintsAsync(string accessToken, string cloudId, string projectKey, CancellationToken cancellationToken = default)
     {
         // Sprints live on a *board*, not directly on a project — a project
         // can have zero (Kanban-only), one, or multiple boards. We fetch
         // every board's sprints and dedupe by name, since almost every real
         // project has exactly one Scrum board.
-        using var boardRequest = new HttpRequestMessage(HttpMethod.Get, $"{ApiBaseUrl}/ex/jira/{cloudId}/rest/agile/1.0/board?projectKeyOrId={Uri.EscapeDataString(projectKey)}");
-        boardRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
-
-        using var boardResponse = await _httpClient.SendAsync(boardRequest, cancellationToken);
-        if (!boardResponse.IsSuccessStatusCode) return new List<JiraSprintDto>(); // no Agile access / no boards — not fatal, sprints are optional
-
-        var boardPage = await boardResponse.Content.ReadFromJsonAsync<BoardPageResponse>(JsonOptions, cancellationToken);
-        var scrumBoards = (boardPage?.Values ?? new()).Where(b => b.Type == "scrum").ToList();
+        var scrumBoards = (await FindBoardsAsync(accessToken, cloudId, projectKey, cancellationToken)).Where(b => b.Type == "scrum").ToList();
 
         var sprintsByName = new Dictionary<string, JiraSprintDto>(StringComparer.OrdinalIgnoreCase);
         foreach (var board in scrumBoards)
@@ -347,6 +352,46 @@ public class JiraApiClient : IJiraClient
         }
 
         return sprintsByName.Values.ToList();
+    }
+
+    /// <summary>
+    /// The left-to-right status order Jira's own board shows — read from the
+    /// first board's column configuration (works for Scrum or Kanban boards
+    /// alike, unlike GetSprintsAsync which only cares about Scrum ones).
+    /// Falls back to an empty list (caller then falls back to whatever order
+    /// it encounters statuses in) if the project has no board, or the site
+    /// doesn't grant Agile API access.
+    /// </summary>
+    public async Task<IReadOnlyList<string>> GetBoardStatusOrderAsync(string accessToken, string cloudId, string projectKey, CancellationToken cancellationToken = default)
+    {
+        var board = (await FindBoardsAsync(accessToken, cloudId, projectKey, cancellationToken)).FirstOrDefault();
+        if (board is null) return new List<string>();
+
+        using var configRequest = new HttpRequestMessage(HttpMethod.Get, $"{ApiBaseUrl}/ex/jira/{cloudId}/rest/agile/1.0/board/{board.Id}/configuration");
+        configRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        using var configResponse = await _httpClient.SendAsync(configRequest, cancellationToken);
+        if (!configResponse.IsSuccessStatusCode) return new List<string>();
+
+        var config = await configResponse.Content.ReadFromJsonAsync<BoardConfigResponse>(JsonOptions, cancellationToken);
+        var statusIds = (config?.ColumnConfig?.Columns ?? new())
+            .SelectMany(c => c.Statuses ?? new())
+            .Select(s => s.Id)
+            .ToList();
+        if (statusIds.Count == 0) return new List<string>();
+
+        // The column config only gives status IDs, not names — the site-wide
+        // status list is what maps one to the other.
+        using var statusRequest = new HttpRequestMessage(HttpMethod.Get, $"{ApiBaseUrl}/ex/jira/{cloudId}/rest/api/2/status");
+        statusRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        using var statusResponse = await _httpClient.SendAsync(statusRequest, cancellationToken);
+        if (!statusResponse.IsSuccessStatusCode) return new List<string>();
+
+        var allStatuses = await statusResponse.Content.ReadFromJsonAsync<List<StatusResponse>>(JsonOptions, cancellationToken) ?? new();
+        var nameById = allStatuses.ToDictionary(s => s.Id, s => s.Name);
+
+        return statusIds.Where(id => nameById.ContainsKey(id)).Select(id => nameById[id]).ToList();
     }
 
     // --- Wire DTOs — deliberately kept private to this class; the rest of the app only ever sees IJiraClient's own DTOs above. ---
@@ -423,6 +468,16 @@ public class JiraApiClient : IJiraClient
     private record BoardPageResponse(List<BoardResponse> Values);
 
     private record BoardResponse(long Id, string Name, string Type);
+
+    private record BoardConfigResponse([property: JsonPropertyName("columnConfig")] BoardColumnConfig? ColumnConfig);
+
+    private record BoardColumnConfig(List<BoardConfigColumn>? Columns);
+
+    private record BoardConfigColumn(string Name, List<BoardConfigStatus>? Statuses);
+
+    private record BoardConfigStatus(string Id);
+
+    private record StatusResponse(string Id, string Name);
 
     private record SprintPageResponse(List<SprintResponse> Values);
 

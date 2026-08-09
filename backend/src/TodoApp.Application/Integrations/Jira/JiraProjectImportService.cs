@@ -138,6 +138,11 @@ public class JiraProjectImportService
                 .ToList();
             var remainingKeys = team.Columns.Select(c => c.Key).Where(k => !jiraOrderedKeys.Contains(k)).ToList();
             team.ReorderColumns(jiraOrderedKeys.Concat(remainingKeys).ToList(), requestingUserId);
+            _logger.LogInformation("Reordered board columns for team {TeamId} to match Jira: {Order}", team.Id, string.Join(", ", jiraOrderedKeys.Concat(remainingKeys)));
+        }
+        else
+        {
+            _logger.LogWarning("Skipped Jira column reordering for team {TeamId} (isOwner={IsOwner}, jiraStatusOrderCount={Count})", team.Id, isOwner, jiraStatusOrder.Count);
         }
 
         // One save for the new columns, new labels, and reordering — all

@@ -2,6 +2,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using TodoApp.Application.Common;
 
@@ -40,9 +41,11 @@ public class JiraApiClient : IJiraClient
 
     private readonly HttpClient _httpClient;
     private readonly JiraSettings _settings;
+    private readonly ILogger<JiraApiClient> _logger;
 
-    public JiraApiClient(HttpClient httpClient, IOptions<JiraSettings> settings)
+    public JiraApiClient(HttpClient httpClient, IOptions<JiraSettings> settings, ILogger<JiraApiClient> logger)
     {
+        _logger = logger;
         _httpClient = httpClient;
         _settings = settings.Value;
     }
@@ -323,7 +326,12 @@ public class JiraApiClient : IJiraClient
         boardRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
 
         using var boardResponse = await _httpClient.SendAsync(boardRequest, cancellationToken);
-        if (!boardResponse.IsSuccessStatusCode) return new List<BoardResponse>(); // no Agile access / no boards — not fatal, sprints/column-order are both optional
+        if (!boardResponse.IsSuccessStatusCode)
+        {
+            var body = await boardResponse.Content.ReadAsStringAsync(cancellationToken);
+            _logger.LogWarning("Jira board lookup failed for project {ProjectKey}: {StatusCode} {Body}", projectKey, (int)boardResponse.StatusCode, body);
+            return new List<BoardResponse>(); // no Agile access / no boards — not fatal, sprints/column-order are both optional
+        }
 
         var boardPage = await boardResponse.Content.ReadFromJsonAsync<BoardPageResponse>(JsonOptions, cancellationToken);
         return boardPage?.Values ?? new();
@@ -365,20 +373,33 @@ public class JiraApiClient : IJiraClient
     public async Task<IReadOnlyList<string>> GetBoardStatusOrderAsync(string accessToken, string cloudId, string projectKey, CancellationToken cancellationToken = default)
     {
         var board = (await FindBoardsAsync(accessToken, cloudId, projectKey, cancellationToken)).FirstOrDefault();
-        if (board is null) return new List<string>();
+        if (board is null)
+        {
+            _logger.LogWarning("No Jira board found for project {ProjectKey} — column order falls back to encounter order.", projectKey);
+            return new List<string>();
+        }
 
         using var configRequest = new HttpRequestMessage(HttpMethod.Get, $"{ApiBaseUrl}/ex/jira/{cloudId}/rest/agile/1.0/board/{board.Id}/configuration");
         configRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
 
         using var configResponse = await _httpClient.SendAsync(configRequest, cancellationToken);
-        if (!configResponse.IsSuccessStatusCode) return new List<string>();
+        if (!configResponse.IsSuccessStatusCode)
+        {
+            var body = await configResponse.Content.ReadAsStringAsync(cancellationToken);
+            _logger.LogWarning("Jira board configuration lookup failed for board {BoardId}: {StatusCode} {Body}", board.Id, (int)configResponse.StatusCode, body);
+            return new List<string>();
+        }
 
         var config = await configResponse.Content.ReadFromJsonAsync<BoardConfigResponse>(JsonOptions, cancellationToken);
         var statusIds = (config?.ColumnConfig?.Columns ?? new())
             .SelectMany(c => c.Statuses ?? new())
             .Select(s => s.Id)
             .ToList();
-        if (statusIds.Count == 0) return new List<string>();
+        if (statusIds.Count == 0)
+        {
+            _logger.LogWarning("Jira board {BoardId} configuration had no column/status data.", board.Id);
+            return new List<string>();
+        }
 
         // The column config only gives status IDs, not names — the site-wide
         // status list is what maps one to the other.
@@ -386,12 +407,19 @@ public class JiraApiClient : IJiraClient
         statusRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
 
         using var statusResponse = await _httpClient.SendAsync(statusRequest, cancellationToken);
-        if (!statusResponse.IsSuccessStatusCode) return new List<string>();
+        if (!statusResponse.IsSuccessStatusCode)
+        {
+            var body = await statusResponse.Content.ReadAsStringAsync(cancellationToken);
+            _logger.LogWarning("Jira status list lookup failed: {StatusCode} {Body}", (int)statusResponse.StatusCode, body);
+            return new List<string>();
+        }
 
         var allStatuses = await statusResponse.Content.ReadFromJsonAsync<List<StatusResponse>>(JsonOptions, cancellationToken) ?? new();
         var nameById = allStatuses.ToDictionary(s => s.Id, s => s.Name);
 
-        return statusIds.Where(id => nameById.ContainsKey(id)).Select(id => nameById[id]).ToList();
+        var order = statusIds.Where(id => nameById.ContainsKey(id)).Select(id => nameById[id]).ToList();
+        _logger.LogInformation("Jira board {BoardId} status order resolved: {Order}", board.Id, string.Join(" -> ", order));
+        return order;
     }
 
     // --- Wire DTOs — deliberately kept private to this class; the rest of the app only ever sees IJiraClient's own DTOs above. ---

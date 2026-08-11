@@ -49,18 +49,41 @@ public class AzureDevOpsIntegrationsController : ControllerBase
     }
 
     [HttpPost("projects/{projectName}/import")]
-    public async Task<IActionResult> Import(string projectName, [FromQuery] string teamId, CancellationToken cancellationToken)
+    public async Task<IActionResult> Import(string projectName, [FromQuery] string teamId, [FromQuery] bool? setAutoSync, CancellationToken cancellationToken)
     {
-        var summary = await _mediator.Send(new ImportFromAzureDevOpsCommand(teamId, User.GetUserId(), projectName), cancellationToken);
+        var summary = await _mediator.Send(new ImportFromAzureDevOpsCommand(teamId, User.GetUserId(), projectName, setAutoSync), cancellationToken);
         return Ok(summary);
     }
 
     [HttpPost("projects/{projectName}/create-team")]
     public async Task<IActionResult> CreateTeamFromProject(string projectName, [FromBody] CreateTeamFromAzureDevOpsRequest? request, CancellationToken cancellationToken)
     {
-        var result = await _mediator.Send(new CreateTeamFromAzureDevOpsCommand(User.GetUserId(), projectName, request?.TeamName), cancellationToken);
+        var result = await _mediator.Send(new CreateTeamFromAzureDevOpsCommand(User.GetUserId(), projectName, request?.TeamName, request?.SetAutoSync), cancellationToken);
         return Ok(result);
     }
 
-    public record CreateTeamFromAzureDevOpsRequest(string? TeamName);
+    public record CreateTeamFromAzureDevOpsRequest(string? TeamName, bool? SetAutoSync);
+
+    [HttpGet("teams/{teamId}/sync-status")]
+    public async Task<IActionResult> GetSyncStatus(string teamId, CancellationToken cancellationToken)
+    {
+        var status = await _mediator.Send(new GetAzureDevOpsSyncStatusQuery(teamId, User.GetUserId()), cancellationToken);
+        return Ok(status);
+    }
+
+    [HttpPut("teams/{teamId}/auto-sync")]
+    public async Task<IActionResult> SetAutoSync(string teamId, [FromBody] SetAutoSyncRequest request, CancellationToken cancellationToken)
+    {
+        await _mediator.Send(new SetAzureDevOpsAutoSyncCommand(teamId, User.GetUserId(), request.Enabled), cancellationToken);
+        return NoContent();
+    }
+
+    public record SetAutoSyncRequest(bool Enabled);
+
+    [HttpPost("teams/{teamId}/sync-now")]
+    public async Task<IActionResult> SyncNow(string teamId, CancellationToken cancellationToken)
+    {
+        var summary = await _mediator.Send(new SyncAzureDevOpsTeamNowCommand(teamId, User.GetUserId()), cancellationToken);
+        return Ok(summary);
+    }
 }

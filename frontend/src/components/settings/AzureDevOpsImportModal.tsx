@@ -26,6 +26,7 @@ export default function AzureDevOpsImportModal({ onClose }: AzureDevOpsImportMod
   const [selectedProject, setSelectedProject] = useState<AzureDevOpsProject | null>(null)
   const [myTeams, setMyTeams] = useState<Team[]>([])
   const [selectedTeamId, setSelectedTeamId] = useState('')
+  const [autoSync, setAutoSync] = useState(false)
   const [summary, setSummary] = useState<ImportSummary | null>(null)
 
   useEffect(() => {
@@ -51,7 +52,7 @@ export default function AzureDevOpsImportModal({ onClose }: AzureDevOpsImportMod
     setStep('importing')
     setBusy(true)
     try {
-      const result = await azureDevOpsApi.importProject(selectedProject.name, selectedTeamId)
+      const result = await azureDevOpsApi.importProject(selectedProject.name, selectedTeamId, autoSync)
       setSummary(result)
       setStep('summary')
     } catch {
@@ -105,11 +106,16 @@ export default function AzureDevOpsImportModal({ onClose }: AzureDevOpsImportMod
               </select>
             )}
             <p style={{ fontSize: 11.5, color: 'var(--color-ink-faint)', marginTop: 8 }}>
-              Work items, tags, story points, and priority come along. Every distinct work item
-              state becomes a matching board column. Assignees are matched by email when they
-              already have a Eunomia account — otherwise they get an email invite to join.
-              Re-importing later updates existing stories instead of duplicating them.
+              Work items, tags, story points, priority, comments, attachments, iterations, and
+              work item links come along. Every distinct work item state becomes a matching board
+              column. Assignees are matched by email when they already have a Eunomia account —
+              otherwise they get an email invite to join. Re-importing later updates existing
+              stories instead of duplicating them.
             </p>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, fontSize: 12.5 }}>
+              <input type="checkbox" checked={autoSync} onChange={(e) => setAutoSync(e.target.checked)} />
+              Keep this team in sync with Azure DevOps (re-imports automatically every few hours)
+            </label>
           </>
         )}
 

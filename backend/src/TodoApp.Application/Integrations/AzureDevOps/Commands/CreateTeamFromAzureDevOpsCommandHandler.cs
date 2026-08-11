@@ -1,4 +1,5 @@
 using MediatR;
+using TodoApp.Application.Integrations.AzureDevOps;
 using TodoApp.Application.Common;
 using TodoApp.Application.Teams.DTOs;
 using TodoApp.Domain.Integrations;
@@ -44,7 +45,7 @@ public class CreateTeamFromAzureDevOpsCommandHandler : IRequestHandler<CreateTea
         await _teamRepository.AddAsync(team, cancellationToken);
         await _mediator.PublishDomainEventsAsync(team, cancellationToken);
 
-        var summary = await _importService.ImportAsync(team, connection.OrganizationName, request.ProjectName, pat, request.RequestingUserId, cancellationToken);
+        var summary = await _importService.ImportAsync(team, connection.OrganizationName, request.ProjectName, pat, request.RequestingUserId, request.SetAutoSync, cancellationToken);
 
         return new CreateTeamFromAzureDevOpsResult(TeamMapper.ToDto(team), summary);
     }

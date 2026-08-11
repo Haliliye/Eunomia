@@ -50,6 +50,7 @@ public static class DependencyInjection
         services.AddScoped<IPersonalTaskRepository, PersonalTaskRepository>();
         services.AddScoped<IJiraConnectionRepository, JiraConnectionRepository>();
         services.AddScoped<IAzureDevOpsConnectionRepository, AzureDevOpsConnectionRepository>();
+        services.AddScoped<IAzureDevOpsProjectSyncRepository, AzureDevOpsProjectSyncRepository>();
         services.AddScoped<IEmailSignupInvitationRepository, EmailSignupInvitationRepository>();
         services.AddScoped<IJiraProjectSyncRepository, JiraProjectSyncRepository>();
         services.AddScoped<TodoApp.Domain.Boards.IBoardRepository, BoardRepository>();

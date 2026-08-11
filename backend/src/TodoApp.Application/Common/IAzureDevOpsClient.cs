@@ -16,6 +16,14 @@ public interface IAzureDevOpsClient
     Task<IReadOnlyList<AzureDevOpsProjectDto>> GetProjectsAsync(string personalAccessToken, string organization, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<AzureDevOpsWorkItemDto>> GetWorkItemsAsync(string personalAccessToken, string organization, string projectName, CancellationToken cancellationToken = default);
+
+    /// <summary>No batch endpoint exists for comments — one call per work item, same trade-off as Jira's per-issue comment fetch would be if it weren't inline on the issue.</summary>
+    Task<IReadOnlyList<AzureDevOpsCommentDto>> GetCommentsAsync(string personalAccessToken, string organization, string projectName, string workItemId, CancellationToken cancellationToken = default);
+
+    Task<Stream> DownloadAttachmentAsync(string personalAccessToken, string downloadUrl, CancellationToken cancellationToken = default);
+
+    /// <summary>The project's iteration (sprint) tree, flattened — see AzureDevOpsIterationDto.</summary>
+    Task<IReadOnlyList<AzureDevOpsIterationDto>> GetIterationsAsync(string personalAccessToken, string organization, string projectName, CancellationToken cancellationToken = default);
 }
 
 public record AzureDevOpsProjectDto(string Id, string Name);
@@ -29,4 +37,18 @@ public record AzureDevOpsWorkItemDto(
     DateTime? DueDate,
     IReadOnlyList<string> Tags,
     string? AssigneeEmail,
-    int? StoryPoints);
+    int? StoryPoints,
+    IReadOnlyList<AzureDevOpsLinkDto> Links,
+    IReadOnlyList<AzureDevOpsAttachmentDto> Attachments,
+    string? IterationPath,
+    string? ParentWorkItemId);
+
+/// <summary>RelationType is one of Azure DevOps' own link type reference names, trimmed to the part after the last dot for readability (e.g. "Related", "Hierarchy-Forward") — mapped to our StoryLinkType in AzureDevOpsIssueMapper's caller, not here.</summary>
+public record AzureDevOpsLinkDto(string TargetWorkItemId, string RelationType);
+
+public record AzureDevOpsAttachmentDto(string FileName, string ContentType, long SizeBytes, string DownloadUrl);
+
+/// <summary>AuthorEmail can be null (same privacy-setting caveat as Jira's AssigneeEmail) — falls back to AuthorDisplayName for the imported comment's byline.</summary>
+public record AzureDevOpsCommentDto(string? AuthorEmail, string AuthorDisplayName, string Text, DateTime CreatedOn);
+
+public record AzureDevOpsIterationDto(string Name, DateTime? StartDate, DateTime? FinishDate);

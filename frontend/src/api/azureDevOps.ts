@@ -18,6 +18,13 @@ export interface CreateTeamFromAzureDevOpsResult {
   importSummary: ImportSummary
 }
 
+export interface AzureDevOpsSyncStatus {
+  isLinked: boolean
+  projectName?: string
+  autoSyncEnabled: boolean
+  lastSyncedOn?: string
+}
+
 export const azureDevOpsApi = {
   getStatus: () => apiClient.get<AzureDevOpsStatus>('/integrations/azuredevops/status').then((res) => res.data),
 
@@ -29,9 +36,18 @@ export const azureDevOpsApi = {
 
   getProjects: () => apiClient.get<AzureDevOpsProject[]>('/integrations/azuredevops/projects').then((res) => res.data),
 
-  importProject: (projectName: string, teamId: string) =>
-    apiClient.post<ImportSummary>(`/integrations/azuredevops/projects/${encodeURIComponent(projectName)}/import`, null, { params: { teamId } }).then((res) => res.data),
+  importProject: (projectName: string, teamId: string, setAutoSync?: boolean) =>
+    apiClient.post<ImportSummary>(`/integrations/azuredevops/projects/${encodeURIComponent(projectName)}/import`, null, { params: { teamId, setAutoSync } }).then((res) => res.data),
 
-  createTeamFromProject: (projectName: string, teamName?: string) =>
-    apiClient.post<CreateTeamFromAzureDevOpsResult>(`/integrations/azuredevops/projects/${encodeURIComponent(projectName)}/create-team`, { teamName }).then((res) => res.data),
+  createTeamFromProject: (projectName: string, teamName?: string, setAutoSync?: boolean) =>
+    apiClient.post<CreateTeamFromAzureDevOpsResult>(`/integrations/azuredevops/projects/${encodeURIComponent(projectName)}/create-team`, { teamName, setAutoSync }).then((res) => res.data),
+
+  getSyncStatus: (teamId: string) =>
+    apiClient.get<AzureDevOpsSyncStatus>(`/integrations/azuredevops/teams/${teamId}/sync-status`).then((res) => res.data),
+
+  setAutoSync: (teamId: string, enabled: boolean) =>
+    apiClient.put(`/integrations/azuredevops/teams/${teamId}/auto-sync`, { enabled }),
+
+  syncTeamNow: (teamId: string) =>
+    apiClient.post<ImportSummary>(`/integrations/azuredevops/teams/${teamId}/sync-now`).then((res) => res.data),
 }

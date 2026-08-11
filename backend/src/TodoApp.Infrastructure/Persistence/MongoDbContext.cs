@@ -38,4 +38,5 @@ public class MongoDbContext
     public IMongoCollection<JiraProjectSyncDocument> JiraProjectSyncs => _database.GetCollection<JiraProjectSyncDocument>("jiraProjectSyncs");
     public IMongoCollection<BoardDocument> Boards => _database.GetCollection<BoardDocument>("boards");
     public IMongoCollection<AzureDevOpsConnectionDocument> AzureDevOpsConnections => _database.GetCollection<AzureDevOpsConnectionDocument>("azureDevOpsConnections");
+    public IMongoCollection<AzureDevOpsProjectSyncDocument> AzureDevOpsProjectSyncs => _database.GetCollection<AzureDevOpsProjectSyncDocument>("azureDevOpsProjectSyncs");
 }

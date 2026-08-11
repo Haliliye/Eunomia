@@ -3,4 +3,4 @@ using TodoApp.Application.UserStories.Commands.ImportUserStories;
 
 namespace TodoApp.Application.Integrations.AzureDevOps.Commands;
 
-public record ImportFromAzureDevOpsCommand(string TeamId, string RequestingUserId, string ProjectName) : IRequest<ImportSummaryDto>;
+public record ImportFromAzureDevOpsCommand(string TeamId, string RequestingUserId, string ProjectName, bool? SetAutoSync = null) : IRequest<ImportSummaryDto>;

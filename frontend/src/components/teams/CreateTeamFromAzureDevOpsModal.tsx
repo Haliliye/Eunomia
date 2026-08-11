@@ -20,6 +20,7 @@ export default function CreateTeamFromAzureDevOpsModal({ onClose }: CreateTeamFr
   const [selectedProject, setSelectedProject] = useState<AzureDevOpsProject | null>(null)
   const [teamName, setTeamName] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [autoSync, setAutoSync] = useState(false)
   const [result, setResult] = useState<CreateTeamFromAzureDevOpsResult | null>(null)
 
   useEffect(() => {
@@ -45,7 +46,7 @@ export default function CreateTeamFromAzureDevOpsModal({ onClose }: CreateTeamFr
     setStep('creating')
     setError(null)
     try {
-      const created = await azureDevOpsApi.createTeamFromProject(selectedProject.name, teamName.trim())
+      const created = await azureDevOpsApi.createTeamFromProject(selectedProject.name, teamName.trim(), autoSync)
       setResult(created)
       setStep('summary')
     } catch (err: any) {
@@ -110,11 +111,16 @@ export default function CreateTeamFromAzureDevOpsModal({ onClose }: CreateTeamFr
               <input id="ado-team-name" className="input" value={teamName} onChange={(e) => setTeamName(e.target.value)} maxLength={50} autoFocus />
             </div>
             <p style={{ fontSize: 11.5, color: 'var(--color-ink-faint)', marginTop: 4 }}>
-              Every work item in {selectedProject.name} will be imported, along with tags and story
-              points. The new team's board gets one column per distinct work item state. Assignees
-              with a matching Eunomia account are assigned automatically; others get an email
-              invitation to join and are added to this team once they sign up.
+              Every work item in {selectedProject.name} will be imported, along with tags, story
+              points, comments, attachments, iterations, and work item links. The new team's board
+              gets one column per distinct work item state. Assignees with a matching Eunomia
+              account are assigned automatically; others get an email invitation to join and are
+              added to this team once they sign up.
             </p>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, fontSize: 12.5 }}>
+              <input type="checkbox" checked={autoSync} onChange={(e) => setAutoSync(e.target.checked)} />
+              Keep this team in sync with Azure DevOps (re-imports automatically every few hours)
+            </label>
             {error && <p className="field-error" role="alert">{error}</p>}
             <div className="modal-actions" style={{ marginTop: 16 }}>
               <button className="btn" onClick={() => setStep('project')}>Back</button>

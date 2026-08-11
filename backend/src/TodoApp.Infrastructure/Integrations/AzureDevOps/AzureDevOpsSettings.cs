@@ -1,6 +1,6 @@
 namespace TodoApp.Infrastructure.Integrations.AzureDevOps;
 
-/// <summary>Config for the Azure AD (Microsoft identity platform) app registration used for Azure DevOps OAuth — see /areas setup notes.</summary>
+/// <summary>Config for the Azure DevOps OAuth app registered at app.vsaex.visualstudio.com/app/register — not an Azure AD/Entra ID app registration, since Entra apps don't support personal Microsoft accounts for the Azure DevOps resource (Microsoft's own stated limitation). See AzureDevOpsApiClient.</summary>
 public class AzureDevOpsSettings
 {
     public const string SectionName = "AzureDevOps";

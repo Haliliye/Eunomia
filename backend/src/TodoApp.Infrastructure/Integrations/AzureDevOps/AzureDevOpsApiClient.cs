@@ -10,33 +10,26 @@ using TodoApp.Application.Common;
 namespace TodoApp.Infrastructure.Integrations.AzureDevOps;
 
 /// <summary>
-/// Talks to the Microsoft identity platform (login.microsoftonline.com) for
-/// OAuth and the Azure DevOps REST API (dev.azure.com / app.vssps.visualstudio.com)
-/// for everything else. Uses the standard Microsoft identity platform
-/// authorization-code flow (not Azure DevOps' older app.vssps.visualstudio.com
-/// OAuth, which needs a JWT-signed client assertion for token exchange) —
-/// same request/response shape as Jira's OAuth, see JiraApiClient.
+/// Talks to Azure DevOps' own OAuth 2.0 endpoints (app.vssps.visualstudio.com)
+/// — not the Microsoft identity platform (Entra ID) flow, because Microsoft's
+/// own docs state Entra apps "don't natively support Microsoft account (MSA)
+/// users for the Azure DevOps resource" and recommend this classic flow for
+/// exactly that reason. The one real wrinkle versus a standard OAuth token
+/// exchange (see JiraApiClient for comparison): the token request's
+/// "client_assertion" parameter, despite the name, is just the app's plain
+/// secret string here — not an actual signed JWT.
 /// </summary>
 public class AzureDevOpsApiClient : IAzureDevOpsClient
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
-    // "organizations" (not "common") — Azure DevOps requires a work/school
-    // or Microsoft account that's a member of at least one org; using the
-    // narrower tenant endpoint avoids surfacing personal-only accounts that
-    // could never have an org anyway.
-    // "common" (not "organizations") — Azure DevOps genuinely supports both
-    // work/school accounts AND personal Microsoft accounts (many solo
-    // developers use a plain @outlook.com or a Gmail-linked MSA), and
-    // "organizations" rejects the latter outright with a confusing
-    // "account doesn't exist in tenant" error. "common" lets Microsoft
-    // resolve whichever account type actually signed in.
-    private const string AuthBaseUrl = "https://login.microsoftonline.com/common/oauth2/v2.0";
+    private const string AuthBaseUrl = "https://app.vssps.visualstudio.com/oauth2";
 
-    // Azure DevOps' fixed resource Application ID — every Azure DevOps OAuth
-    // integration requests scopes under this id, it's not specific to our app.
-    private const string AzureDevOpsResourceId = "499b84ac-1321-427f-aa17-267ca6975798";
-    private const string Scopes = $"{AzureDevOpsResourceId}/user_impersonation offline_access";
+    // Classic Azure DevOps OAuth scopes (distinct from the Microsoft Graph /
+    // Entra style scopes) — read-only across work items, projects, and the
+    // user's own profile (the last one is what accounts/profile lookups in
+    // GetOrganizationsAsync need).
+    private const string Scopes = "vso.work vso.project vso.profile";
 
     private readonly HttpClient _httpClient;
     private readonly AzureDevOpsSettings _settings;
@@ -54,9 +47,8 @@ public class AzureDevOpsApiClient : IAzureDevOpsClient
         var query = new Dictionary<string, string>
         {
             ["client_id"] = _settings.ClientId,
-            ["response_type"] = "code",
+            ["response_type"] = "Assertion",
             ["redirect_uri"] = _settings.RedirectUri,
-            ["response_mode"] = "query",
             ["scope"] = Scopes,
             ["state"] = state,
         };
@@ -67,22 +59,21 @@ public class AzureDevOpsApiClient : IAzureDevOpsClient
     public async Task<AzureDevOpsTokenResult> ExchangeCodeForTokenAsync(string code, CancellationToken cancellationToken = default) =>
         await RequestTokenAsync(new Dictionary<string, string>
         {
-            ["grant_type"] = "authorization_code",
-            ["client_id"] = _settings.ClientId,
-            ["client_secret"] = _settings.ClientSecret,
-            ["code"] = code,
+            ["client_assertion_type"] = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
+            ["client_assertion"] = _settings.ClientSecret,
+            ["grant_type"] = "urn:ietf:params:oauth:grant-type:jwt-bearer",
+            ["assertion"] = code,
             ["redirect_uri"] = _settings.RedirectUri,
-            ["scope"] = Scopes,
         }, cancellationToken);
 
     public async Task<AzureDevOpsTokenResult> RefreshTokenAsync(string refreshToken, CancellationToken cancellationToken = default) =>
         await RequestTokenAsync(new Dictionary<string, string>
         {
+            ["client_assertion_type"] = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
+            ["client_assertion"] = _settings.ClientSecret,
             ["grant_type"] = "refresh_token",
-            ["client_id"] = _settings.ClientId,
-            ["client_secret"] = _settings.ClientSecret,
-            ["refresh_token"] = refreshToken,
-            ["scope"] = Scopes,
+            ["assertion"] = refreshToken,
+            ["redirect_uri"] = _settings.RedirectUri,
         }, cancellationToken);
 
     private async Task<AzureDevOpsTokenResult> RequestTokenAsync(Dictionary<string, string> form, CancellationToken cancellationToken)

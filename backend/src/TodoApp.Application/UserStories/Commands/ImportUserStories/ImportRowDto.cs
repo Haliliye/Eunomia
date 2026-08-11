@@ -14,6 +14,7 @@ public record ImportRowDto(
     DateTime? DueDate,
     int? StoryPoints,
     IReadOnlyList<string> LabelNames,
-    string? JiraIssueKey = null);
+    string? JiraIssueKey = null,
+    string? AzureDevOpsWorkItemId = null);
 
 public record ImportSummaryDto(int CreatedCount, int SkippedCount, IReadOnlyList<ImportRowDto> Rows, int UpdatedCount = 0);

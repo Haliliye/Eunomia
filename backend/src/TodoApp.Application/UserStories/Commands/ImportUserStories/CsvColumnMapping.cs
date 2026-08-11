@@ -28,4 +28,5 @@ public record CsvColumnMapping(
     // update existing stories (matched by this key) instead of duplicating
     // them. Never populated for a CSV import: there's no reliable external
     // key in an arbitrary export, so every CSV row always creates a new story.
-    string? JiraIssueKeyColumn = null);
+    string? JiraIssueKeyColumn = null,
+    string? AzureDevOpsWorkItemIdColumn = null);

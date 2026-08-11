@@ -35,6 +35,7 @@ public class UserStoryDocument
     public string? ParentId { get; set; }
     public string? JiraIssueKey { get; set; }
     public string? EpicId { get; set; }
+    public string? AzureDevOpsWorkItemId { get; set; }
 }
 
 public class StoryLinkDocument

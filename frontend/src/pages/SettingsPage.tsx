@@ -4,6 +4,7 @@ import type { NotificationPreferences } from '@/types/notificationPreferences'
 import { useToast } from '@/context/ToastContext'
 import { Skeleton } from '@/components/common/Skeleton'
 import JiraIntegrationCard from '@/components/settings/JiraIntegrationCard'
+import AzureDevOpsIntegrationCard from '@/components/settings/AzureDevOpsIntegrationCard'
 
 // Excludes reminderLeadTimeHours (a number, handled by its own input below,
 // not a checkbox) — narrowing this here is what makes prefs[opt.key] resolve
@@ -95,6 +96,7 @@ export default function SettingsPage() {
       </div>
 
       <JiraIntegrationCard />
+      <AzureDevOpsIntegrationCard />
     </section>
   )
 }

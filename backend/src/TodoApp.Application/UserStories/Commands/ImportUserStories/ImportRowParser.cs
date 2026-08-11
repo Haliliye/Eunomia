@@ -46,6 +46,7 @@ internal static class ImportRowParser
         var labelsIndex = IndexFor(mapping.LabelsColumn);
         var assigneeEmailIndex = IndexFor(mapping.AssigneeEmailColumn);
         var jiraIssueKeyIndex = IndexFor(mapping.JiraIssueKeyColumn);
+        var azureDevOpsWorkItemIdIndex = IndexFor(mapping.AzureDevOpsWorkItemIdColumn);
 
         // Skip the header row.
         for (var i = 1; i < rows.Count; i++)
@@ -77,6 +78,7 @@ internal static class ImportRowParser
 
             var assigneeEmail = Col(assigneeEmailIndex);
             var jiraIssueKey = Col(jiraIssueKeyIndex);
+            var azureDevOpsWorkItemId = Col(azureDevOpsWorkItemIdIndex);
 
             // A source's assignee name (CSV exports) can't be reliably matched
             // to one of our accounts, so that path stays unassigned — but a
@@ -84,7 +86,8 @@ internal static class ImportRowParser
             // resolved downstream in UserStoryRowApplier.
             results.Add(new ImportRowDto(rowNumber, true, null, title, string.IsNullOrWhiteSpace(description) ? null : description,
                 status, priority, string.IsNullOrWhiteSpace(assigneeEmail) ? null : assigneeEmail, dueDate, storyPoints, labelNames,
-                string.IsNullOrWhiteSpace(jiraIssueKey) ? null : jiraIssueKey));
+                string.IsNullOrWhiteSpace(jiraIssueKey) ? null : jiraIssueKey,
+                string.IsNullOrWhiteSpace(azureDevOpsWorkItemId) ? null : azureDevOpsWorkItemId));
         }
 
         return results;

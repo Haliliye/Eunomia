@@ -163,7 +163,8 @@ public class UserStoryRepository : IUserStoryRepository
         CreatedByUserId = story.CreatedByUserId,
         ParentId = story.ParentId,
         JiraIssueKey = story.JiraIssueKey,
-        EpicId = story.EpicId
+        EpicId = story.EpicId,
+        AzureDevOpsWorkItemId = story.AzureDevOpsWorkItemId
     };
 
     private static UserStory ToDomain(UserStoryDocument document) => UserStory.Rehydrate(
@@ -192,7 +193,8 @@ public class UserStoryRepository : IUserStoryRepository
         document.CreatedByUserId,
         document.ParentId,
         document.JiraIssueKey,
-        document.EpicId);
+        document.EpicId,
+        document.AzureDevOpsWorkItemId);
 
     public async Task<IReadOnlyList<UserStory>> GetPendingReminderCandidatesAsync(CancellationToken cancellationToken = default)
     {
@@ -231,6 +233,19 @@ public class UserStoryRepository : IUserStoryRepository
         var filter = Builders<UserStoryDocument>.Filter.And(
             Builders<UserStoryDocument>.Filter.Eq(s => s.TeamId, teamId),
             Builders<UserStoryDocument>.Filter.In(s => s.JiraIssueKey, keys));
+
+        var documents = await _userStories.Find(filter).ToListAsync(cancellationToken);
+        return documents.Select(ToDomain).ToList();
+    }
+
+    public async Task<IReadOnlyList<UserStory>> GetByAzureDevOpsWorkItemIdsAsync(string teamId, IEnumerable<string> workItemIds, CancellationToken cancellationToken = default)
+    {
+        var ids = workItemIds.ToList();
+        if (ids.Count == 0) return new List<UserStory>();
+
+        var filter = Builders<UserStoryDocument>.Filter.And(
+            Builders<UserStoryDocument>.Filter.Eq(s => s.TeamId, teamId),
+            Builders<UserStoryDocument>.Filter.In(s => s.AzureDevOpsWorkItemId, ids));
 
         var documents = await _userStories.Find(filter).ToListAsync(cancellationToken);
         return documents.Select(ToDomain).ToList();

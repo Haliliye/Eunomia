@@ -56,4 +56,7 @@ public interface IUserStoryRepository
 
     /// <summary>Every story in this team that has one of the given Jira issue keys already on file — used to decide create-vs-update when re-importing the same Jira project (see UserStoryRowApplier). One query instead of N.</summary>
     Task<IReadOnlyList<UserStory>> GetByJiraIssueKeysAsync(string teamId, IEnumerable<string> jiraIssueKeys, CancellationToken cancellationToken = default);
+
+    /// <summary>Same idea as GetByJiraIssueKeysAsync but for Azure DevOps work item ids.</summary>
+    Task<IReadOnlyList<UserStory>> GetByAzureDevOpsWorkItemIdsAsync(string teamId, IEnumerable<string> workItemIds, CancellationToken cancellationToken = default);
 }

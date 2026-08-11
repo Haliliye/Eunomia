@@ -97,6 +97,9 @@ public class UserStory : AggregateRoot
     /// <summary>The Jira issue key (e.g. "KAN-3") this story was imported from — null for stories created directly in Eunomia. Lets re-importing the same project update existing stories instead of creating duplicates; see UserStoryRowApplier.</summary>
     public string? JiraIssueKey { get; private set; }
 
+    /// <summary>Same idea as JiraIssueKey but for Azure DevOps — the work item's numeric id (as a string) this story was imported from.</summary>
+    public string? AzureDevOpsWorkItemId { get; private set; }
+
     /// <summary>
     /// References another UserStory's Id — that story is this one's Epic.
     /// Unlike ParentId (subtasks), an epic link never hides a story from the
@@ -118,7 +121,7 @@ public class UserStory : AggregateRoot
         CreatedOn = DateTime.UtcNow;
     }
 
-    public static UserStory Create(string id, string teamId, string title, string? description, string? createdByUserId = null, string? parentId = null, string? jiraIssueKey = null)
+    public static UserStory Create(string id, string teamId, string title, string? description, string? createdByUserId = null, string? parentId = null, string? jiraIssueKey = null, string? azureDevOpsWorkItemId = null)
     {
         if (string.IsNullOrWhiteSpace(title))
             throw new ArgumentException("Title is required.", nameof(title));
@@ -127,7 +130,8 @@ public class UserStory : AggregateRoot
         {
             CreatedByUserId = createdByUserId,
             ParentId = parentId,
-            JiraIssueKey = jiraIssueKey
+            JiraIssueKey = jiraIssueKey,
+            AzureDevOpsWorkItemId = azureDevOpsWorkItemId
         };
     }
 
@@ -163,7 +167,8 @@ public class UserStory : AggregateRoot
         string? createdByUserId = null,
         string? parentId = null,
         string? jiraIssueKey = null,
-        string? epicId = null)
+        string? epicId = null,
+        string? azureDevOpsWorkItemId = null)
     {
         var story = new UserStory(id, teamId, title, description)
         {
@@ -183,7 +188,8 @@ public class UserStory : AggregateRoot
             CreatedByUserId = createdByUserId,
             ParentId = parentId,
             JiraIssueKey = jiraIssueKey,
-            EpicId = epicId
+            EpicId = epicId,
+            AzureDevOpsWorkItemId = azureDevOpsWorkItemId
         };
 
         if (links is not null)

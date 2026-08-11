@@ -15,6 +15,7 @@ using TodoApp.Domain.Integrations;
 using TodoApp.Infrastructure.Attachments;
 using TodoApp.Infrastructure.Email;
 using TodoApp.Infrastructure.Integrations.Jira;
+using TodoApp.Infrastructure.Integrations.AzureDevOps;
 using TodoApp.Infrastructure.Persistence;
 using TodoApp.Infrastructure.Persistence.Repositories;
 using TodoApp.Infrastructure.Security;
@@ -32,6 +33,7 @@ public static class DependencyInjection
         services.Configure<AttachmentStorageSettings>(configuration.GetSection(AttachmentStorageSettings.SectionName));
         services.Configure<R2StorageSettings>(configuration.GetSection(R2StorageSettings.SectionName));
         services.Configure<JiraSettings>(configuration.GetSection(JiraSettings.SectionName));
+        services.Configure<AzureDevOpsSettings>(configuration.GetSection(AzureDevOpsSettings.SectionName));
         services.Configure<TokenEncryptionSettings>(configuration.GetSection(TokenEncryptionSettings.SectionName));
         services.AddSingleton<MongoDbContext>();
 
@@ -48,6 +50,7 @@ public static class DependencyInjection
         services.AddScoped<ISprintRepository, SprintRepository>();
         services.AddScoped<IPersonalTaskRepository, PersonalTaskRepository>();
         services.AddScoped<IJiraConnectionRepository, JiraConnectionRepository>();
+        services.AddScoped<IAzureDevOpsConnectionRepository, AzureDevOpsConnectionRepository>();
         services.AddScoped<IEmailSignupInvitationRepository, EmailSignupInvitationRepository>();
         services.AddScoped<IJiraProjectSyncRepository, JiraProjectSyncRepository>();
         services.AddScoped<TodoApp.Domain.Boards.IBoardRepository, BoardRepository>();
@@ -102,6 +105,12 @@ public static class DependencyInjection
         if (jiraSettings?.IsConfigured == true)
         {
             services.AddHttpClient<IJiraClient, JiraApiClient>();
+        }
+
+        var azureDevOpsSettings = configuration.GetSection(AzureDevOpsSettings.SectionName).Get<AzureDevOpsSettings>();
+        if (azureDevOpsSettings?.IsConfigured == true)
+        {
+            services.AddHttpClient<IAzureDevOpsClient, AzureDevOpsApiClient>();
         }
 
         return services;

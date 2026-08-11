@@ -4,6 +4,7 @@ import type { Team } from '@/types/team'
 import TeamList from '@/components/teams/TeamList'
 import CreateTeamModal from '@/components/teams/CreateTeamModal'
 import CreateTeamFromJiraModal from '@/components/teams/CreateTeamFromJiraModal'
+import CreateTeamFromAzureDevOpsModal from '@/components/teams/CreateTeamFromAzureDevOpsModal'
 import PendingInvitations from '@/components/teams/PendingInvitations'
 import ConfirmDeleteModal from '@/components/common/ConfirmDeleteModal'
 import { SkeletonTeamGrid } from '@/components/common/Skeleton'
@@ -21,6 +22,7 @@ export default function TeamsPage() {
   const [page, setPage] = useState(1)
   const [isModalOpen, setModalOpen] = useState(false)
   const [isJiraModalOpen, setJiraModalOpen] = useState(false)
+  const [isAzureDevOpsModalOpen, setAzureDevOpsModalOpen] = useState(false)
   const [isLoading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [deletingTeam, setDeletingTeam] = useState<Team | null>(null)
@@ -72,6 +74,7 @@ export default function TeamsPage() {
         </div>
         <div className="page-header-actions">
           <button className="btn" onClick={() => setJiraModalOpen(true)}>Import from Jira</button>
+          <button className="btn" onClick={() => setAzureDevOpsModalOpen(true)}>Import from Azure DevOps</button>
           <button className="btn btn-primary" onClick={() => setModalOpen(true)}>+ New Team</button>
         </div>
       </div>
@@ -94,6 +97,7 @@ export default function TeamsPage() {
         onCreate={handleCreate}
       />
       {isJiraModalOpen && <CreateTeamFromJiraModal onClose={() => setJiraModalOpen(false)} />}
+      {isAzureDevOpsModalOpen && <CreateTeamFromAzureDevOpsModal onClose={() => setAzureDevOpsModalOpen(false)} />}
       <ConfirmDeleteModal
         isOpen={deletingTeam !== null}
         title="Delete team"

@@ -15,7 +15,7 @@ export default function AzureDevOpsIntegrationCard() {
 
   const loadStatus = () => azureDevOpsApi.getStatus().then(setStatus).finally(() => setLoading(false))
 
-  useEffect(loadStatus, [])
+  useEffect(() => { loadStatus() }, [])
 
   const handleConnect = async () => {
     if (!organizationName.trim() || !pat.trim()) return

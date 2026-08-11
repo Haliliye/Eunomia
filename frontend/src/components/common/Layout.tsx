@@ -9,7 +9,7 @@ import { useToast } from '@/context/ToastContext'
 import { teamsApi } from '@/api/teams'
 import { authApi } from '@/api/auth'
 import type { Team } from '@/types/team'
-import { getRecentTeams, type RecentTeam } from '@/lib/recentTeams'
+import { getRecentTeams, removeRecentTeam, type RecentTeam } from '@/lib/recentTeams'
 
 export default function Layout() {
   const [isSearchOpen, setSearchOpen] = useState(false)
@@ -38,9 +38,23 @@ export default function Layout() {
     // immediately, not just after a full page reload. Also re-runs when the
     // logged-in user changes, so switching accounts on the same browser
     // shows that account's own recent teams, not the previous one's.
-    if (user) setRecentTeams(getRecentTeams(user.userId))
-    else setRecentTeams([])
-  }, [location.pathname, user?.userId])
+    if (!user) { setRecentTeams([]); return }
+
+    const stored = getRecentTeams(user.userId)
+    if (teams.length === 0) { setRecentTeams(stored); return }
+
+    // A team that no longer exists (deleted before the fix that keeps
+    // Recent in sync, or removed by someone else) can otherwise linger in
+    // this localStorage cache indefinitely — prune it here against the
+    // teams the person actually still has, and persist the prune so it
+    // doesn't need repeating every navigation.
+    const myTeamIds = new Set(teams.map((t) => t.id))
+    const valid = stored.filter((t) => myTeamIds.has(t.id))
+    if (valid.length !== stored.length) {
+      stored.filter((t) => !myTeamIds.has(t.id)).forEach((t) => removeRecentTeam(user.userId, t.id))
+    }
+    setRecentTeams(valid)
+  }, [location.pathname, user?.userId, teams])
 
   const handleLogout = () => {
     logout()

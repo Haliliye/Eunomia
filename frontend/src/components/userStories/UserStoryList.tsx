@@ -1,29 +1,22 @@
 import { Link } from 'react-router-dom'
 import type { UserStory, UserStoryStatus, UserStoryPriority } from '@/types/userStory'
-import type { TeamMember, Label } from '@/types/team'
+import type { TeamMember, Label, BoardColumn } from '@/types/team'
 import { ticketCode } from '@/lib/ticketCode'
 import { avatarColor } from '@/lib/avatarColor'
 import { displayNameOrId, initialsFor } from '@/hooks/useUserNames'
 import { isOverdue, formatDueDate } from '@/lib/dueDate'
 import LabelChip from '@/components/common/LabelChip'
 
-const ALL_STATUSES: UserStoryStatus[] = ['ToDo', 'Analyze', 'Dev', 'Test', 'Debug', 'Done']
 const ALL_PRIORITIES: UserStoryPriority[] = ['Critical', 'High', 'Medium', 'Low']
-const STATUS_CLASS: Record<UserStoryStatus, string> = {
+// Only the six default columns get a distinct pill color, same reasoning as
+// StatusBadge — a team-added custom column falls back to a neutral style.
+const STATUS_CLASS: Record<string, string> = {
   ToDo: 'backlog-status-pill todo',
   Analyze: 'backlog-status-pill analyze',
   Dev: 'backlog-status-pill dev',
   Test: 'backlog-status-pill test',
   Debug: 'backlog-status-pill debug',
   Done: 'backlog-status-pill done',
-}
-const STATUS_LABEL: Record<UserStoryStatus, string> = {
-  ToDo: 'To Do',
-  Analyze: 'Analyze',
-  Dev: 'Dev',
-  Test: 'Test',
-  Debug: 'Debug',
-  Done: 'Done',
 }
 const PRIORITY_ICON_CLASS: Record<UserStoryPriority, string> = {
   Critical: 'backlog-type-icon critical',
@@ -37,6 +30,7 @@ interface UserStoryListProps {
   stories: UserStory[]
   members: TeamMember[]
   labels: Label[]
+  columns: BoardColumn[]
   userNames: Record<string, string>
   onEdit: (story: UserStory) => void
   onDelete: (story: UserStory) => void
@@ -55,6 +49,7 @@ export default function UserStoryList({
   stories,
   members,
   labels,
+  columns,
   userNames,
   onEdit,
   onDelete,
@@ -141,14 +136,14 @@ export default function UserStoryList({
 
           <div style={{ position: 'relative' }}>
             <select
-              className={STATUS_CLASS[story.status]}
+              className={STATUS_CLASS[story.status] ?? 'backlog-status-pill'}
               aria-label="Status"
               value={story.status}
               onChange={(e) => onStatusChange(story, e.target.value as UserStoryStatus)}
               style={{ appearance: 'none', WebkitAppearance: 'none' }}
             >
-              {ALL_STATUSES.map((s) => (
-                <option key={s} value={s}>{STATUS_LABEL[s]}</option>
+              {columns.map((c) => (
+                <option key={c.key} value={c.key}>{c.name}</option>
               ))}
             </select>
           </div>

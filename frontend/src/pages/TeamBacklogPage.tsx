@@ -479,6 +479,7 @@ export default function TeamBacklogPage() {
             stories={stories}
             members={team.members}
             labels={team.labels}
+            columns={team.columns}
             userNames={userNames}
             onEdit={setEditingStory}
             onDelete={handleDeleteStory}

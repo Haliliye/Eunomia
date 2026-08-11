@@ -25,7 +25,13 @@ public class AzureDevOpsApiClient : IAzureDevOpsClient
     // or Microsoft account that's a member of at least one org; using the
     // narrower tenant endpoint avoids surfacing personal-only accounts that
     // could never have an org anyway.
-    private const string AuthBaseUrl = "https://login.microsoftonline.com/organizations/oauth2/v2.0";
+    // "common" (not "organizations") — Azure DevOps genuinely supports both
+    // work/school accounts AND personal Microsoft accounts (many solo
+    // developers use a plain @outlook.com or a Gmail-linked MSA), and
+    // "organizations" rejects the latter outright with a confusing
+    // "account doesn't exist in tenant" error. "common" lets Microsoft
+    // resolve whichever account type actually signed in.
+    private const string AuthBaseUrl = "https://login.microsoftonline.com/common/oauth2/v2.0";
 
     // Azure DevOps' fixed resource Application ID — every Azure DevOps OAuth
     // integration requests scopes under this id, it's not specific to our app.

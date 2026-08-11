@@ -33,7 +33,6 @@ public static class DependencyInjection
         services.Configure<AttachmentStorageSettings>(configuration.GetSection(AttachmentStorageSettings.SectionName));
         services.Configure<R2StorageSettings>(configuration.GetSection(R2StorageSettings.SectionName));
         services.Configure<JiraSettings>(configuration.GetSection(JiraSettings.SectionName));
-        services.Configure<AzureDevOpsSettings>(configuration.GetSection(AzureDevOpsSettings.SectionName));
         services.Configure<TokenEncryptionSettings>(configuration.GetSection(TokenEncryptionSettings.SectionName));
         services.AddSingleton<MongoDbContext>();
 
@@ -107,11 +106,9 @@ public static class DependencyInjection
             services.AddHttpClient<IJiraClient, JiraApiClient>();
         }
 
-        var azureDevOpsSettings = configuration.GetSection(AzureDevOpsSettings.SectionName).Get<AzureDevOpsSettings>();
-        if (azureDevOpsSettings?.IsConfigured == true)
-        {
-            services.AddHttpClient<IAzureDevOpsClient, AzureDevOpsApiClient>();
-        }
+        // PAT-based (see AzureDevOpsConnection) — no client id/secret to gate
+        // registration on, unlike Jira's OAuth client.
+        services.AddHttpClient<IAzureDevOpsClient, AzureDevOpsApiClient>();
 
         return services;
     }

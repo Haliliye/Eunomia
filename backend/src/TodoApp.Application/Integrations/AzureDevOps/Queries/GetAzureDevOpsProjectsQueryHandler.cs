@@ -1,26 +1,28 @@
 using MediatR;
 using TodoApp.Application.Common;
-using TodoApp.Application.Integrations.AzureDevOps;
+using TodoApp.Domain.Integrations;
 
 namespace TodoApp.Application.Integrations.AzureDevOps.Queries;
 
 public class GetAzureDevOpsProjectsQueryHandler : IRequestHandler<GetAzureDevOpsProjectsQuery, IReadOnlyList<AzureDevOpsProjectDto>>
 {
-    private readonly AzureDevOpsAccessTokenProvider _accessTokenProvider;
+    private readonly IAzureDevOpsConnectionRepository _connectionRepository;
     private readonly IAzureDevOpsClient _client;
+    private readonly ITokenCipher _tokenCipher;
 
-    public GetAzureDevOpsProjectsQueryHandler(AzureDevOpsAccessTokenProvider accessTokenProvider, IAzureDevOpsClient client)
+    public GetAzureDevOpsProjectsQueryHandler(IAzureDevOpsConnectionRepository connectionRepository, IAzureDevOpsClient client, ITokenCipher tokenCipher)
     {
-        _accessTokenProvider = accessTokenProvider;
+        _connectionRepository = connectionRepository;
         _client = client;
+        _tokenCipher = tokenCipher;
     }
 
     public async Task<IReadOnlyList<AzureDevOpsProjectDto>> Handle(GetAzureDevOpsProjectsQuery request, CancellationToken cancellationToken)
     {
-        var (connection, accessToken) = await _accessTokenProvider.GetValidAccessTokenAsync(request.RequestingUserId, cancellationToken);
-        if (string.IsNullOrEmpty(connection.OrganizationName))
-            throw new InvalidOperationException("No Azure DevOps organization selected yet.");
+        var connection = await _connectionRepository.GetByUserIdAsync(request.RequestingUserId, cancellationToken)
+            ?? throw new KeyNotFoundException("Azure DevOps is not connected for this user.");
 
-        return await _client.GetProjectsAsync(accessToken, connection.OrganizationName, cancellationToken);
+        var pat = _tokenCipher.Decrypt(connection.PersonalAccessTokenEncrypted);
+        return await _client.GetProjectsAsync(pat, connection.OrganizationName, cancellationToken);
     }
 }

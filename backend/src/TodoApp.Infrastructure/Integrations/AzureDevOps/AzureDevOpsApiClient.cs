@@ -1,132 +1,57 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using TodoApp.Application.Common;
 
 namespace TodoApp.Infrastructure.Integrations.AzureDevOps;
 
 /// <summary>
-/// Talks to Azure DevOps' own OAuth 2.0 endpoints (app.vssps.visualstudio.com)
-/// — not the Microsoft identity platform (Entra ID) flow, because Microsoft's
-/// own docs state Entra apps "don't natively support Microsoft account (MSA)
-/// users for the Azure DevOps resource" and recommend this classic flow for
-/// exactly that reason. The one real wrinkle versus a standard OAuth token
-/// exchange (see JiraApiClient for comparison): the token request's
-/// "client_assertion" parameter, despite the name, is just the app's plain
-/// secret string here — not an actual signed JWT.
+/// Talks to the Azure DevOps REST API (dev.azure.com), authenticated with a
+/// Personal Access Token (PAT) via HTTP Basic auth (empty username, the PAT
+/// as the password — Azure DevOps' documented way to use a PAT against its
+/// REST API). See AzureDevOpsConnection for why this isn't OAuth: Entra ID
+/// apps don't support personal Microsoft accounts for the Azure DevOps
+/// resource, and Azure DevOps' own classic OAuth app registration has since
+/// been discontinued entirely.
 /// </summary>
 public class AzureDevOpsApiClient : IAzureDevOpsClient
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
-    private const string AuthBaseUrl = "https://app.vssps.visualstudio.com/oauth2";
-
-    // Classic Azure DevOps OAuth scopes (distinct from the Microsoft Graph /
-    // Entra style scopes) — read-only across work items, projects, and the
-    // user's own profile (the last one is what accounts/profile lookups in
-    // GetOrganizationsAsync need).
-    private const string Scopes = "vso.work vso.project vso.profile";
-
     private readonly HttpClient _httpClient;
-    private readonly AzureDevOpsSettings _settings;
     private readonly ILogger<AzureDevOpsApiClient> _logger;
 
-    public AzureDevOpsApiClient(HttpClient httpClient, IOptions<AzureDevOpsSettings> settings, ILogger<AzureDevOpsApiClient> logger)
+    public AzureDevOpsApiClient(HttpClient httpClient, ILogger<AzureDevOpsApiClient> logger)
     {
         _httpClient = httpClient;
-        _settings = settings.Value;
         _logger = logger;
     }
 
-    public string BuildAuthorizationUrl(string state)
+    private static AuthenticationHeaderValue BasicAuthHeader(string personalAccessToken) =>
+        new("Basic", Convert.ToBase64String(Encoding.ASCII.GetBytes($":{personalAccessToken}")));
+
+    public async Task<bool> VerifyAccessAsync(string personalAccessToken, string organization, CancellationToken cancellationToken = default)
     {
-        var query = new Dictionary<string, string>
-        {
-            ["client_id"] = _settings.ClientId,
-            ["response_type"] = "Assertion",
-            ["redirect_uri"] = _settings.RedirectUri,
-            ["scope"] = Scopes,
-            ["state"] = state,
-        };
-        var queryString = string.Join("&", query.Select(kv => $"{kv.Key}={Uri.EscapeDataString(kv.Value)}"));
-        return $"{AuthBaseUrl}/authorize?{queryString}";
-    }
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"https://dev.azure.com/{Uri.EscapeDataString(organization)}/_apis/projects?api-version=7.0&$top=1");
+        request.Headers.Authorization = BasicAuthHeader(personalAccessToken);
 
-    public async Task<AzureDevOpsTokenResult> ExchangeCodeForTokenAsync(string code, CancellationToken cancellationToken = default) =>
-        await RequestTokenAsync(new Dictionary<string, string>
-        {
-            ["client_assertion_type"] = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
-            ["client_assertion"] = _settings.ClientSecret,
-            ["grant_type"] = "urn:ietf:params:oauth:grant-type:jwt-bearer",
-            ["assertion"] = code,
-            ["redirect_uri"] = _settings.RedirectUri,
-        }, cancellationToken);
-
-    public async Task<AzureDevOpsTokenResult> RefreshTokenAsync(string refreshToken, CancellationToken cancellationToken = default) =>
-        await RequestTokenAsync(new Dictionary<string, string>
-        {
-            ["client_assertion_type"] = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
-            ["client_assertion"] = _settings.ClientSecret,
-            ["grant_type"] = "refresh_token",
-            ["assertion"] = refreshToken,
-            ["redirect_uri"] = _settings.RedirectUri,
-        }, cancellationToken);
-
-    private async Task<AzureDevOpsTokenResult> RequestTokenAsync(Dictionary<string, string> form, CancellationToken cancellationToken)
-    {
-        using var content = new FormUrlEncodedContent(form);
-        using var response = await _httpClient.PostAsync($"{AuthBaseUrl}/token", content, cancellationToken);
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
-            var error = await response.Content.ReadAsStringAsync(cancellationToken);
-            throw new InvalidOperationException($"Azure DevOps token request failed ({(int)response.StatusCode}): {error}");
+            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            _logger.LogWarning("Azure DevOps PAT verification failed for org {Organization}: {StatusCode} {Body}", organization, (int)response.StatusCode, body);
         }
-
-        var payload = await response.Content.ReadFromJsonAsync<TokenResponse>(JsonOptions, cancellationToken)
-            ?? throw new InvalidOperationException("Azure DevOps token response was empty.");
-
-        return new AzureDevOpsTokenResult(payload.AccessToken, payload.RefreshToken ?? string.Empty, DateTime.UtcNow.AddSeconds(payload.ExpiresIn));
+        return response.IsSuccessStatusCode;
     }
 
-    public async Task<IReadOnlyList<string>> GetOrganizationsAsync(string accessToken, CancellationToken cancellationToken = default)
-    {
-        using var meRequest = new HttpRequestMessage(HttpMethod.Get, "https://app.vssps.visualstudio.com/_apis/profile/profiles/me?api-version=7.0");
-        meRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
-
-        using var meResponse = await _httpClient.SendAsync(meRequest, cancellationToken);
-        if (!meResponse.IsSuccessStatusCode)
-        {
-            var body = await meResponse.Content.ReadAsStringAsync(cancellationToken);
-            _logger.LogWarning("Azure DevOps profile lookup failed: {StatusCode} {Body}", (int)meResponse.StatusCode, body);
-            return new List<string>();
-        }
-
-        var me = await meResponse.Content.ReadFromJsonAsync<ProfileResponse>(JsonOptions, cancellationToken);
-        if (me?.Id is null) return new List<string>();
-
-        using var accountsRequest = new HttpRequestMessage(HttpMethod.Get, $"https://app.vssps.visualstudio.com/_apis/accounts?memberId={me.Id}&api-version=7.0");
-        accountsRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
-
-        using var accountsResponse = await _httpClient.SendAsync(accountsRequest, cancellationToken);
-        if (!accountsResponse.IsSuccessStatusCode)
-        {
-            var body = await accountsResponse.Content.ReadAsStringAsync(cancellationToken);
-            _logger.LogWarning("Azure DevOps accounts lookup failed: {StatusCode} {Body}", (int)accountsResponse.StatusCode, body);
-            return new List<string>();
-        }
-
-        var accounts = await accountsResponse.Content.ReadFromJsonAsync<AccountsResponse>(JsonOptions, cancellationToken);
-        return (accounts?.Value ?? new()).Select(a => a.AccountName).ToList();
-    }
-
-    public async Task<IReadOnlyList<AzureDevOpsProjectDto>> GetProjectsAsync(string accessToken, string organization, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<AzureDevOpsProjectDto>> GetProjectsAsync(string personalAccessToken, string organization, CancellationToken cancellationToken = default)
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, $"https://dev.azure.com/{Uri.EscapeDataString(organization)}/_apis/projects?api-version=7.0");
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+        request.Headers.Authorization = BasicAuthHeader(personalAccessToken);
 
         using var response = await _httpClient.SendAsync(request, cancellationToken);
         response.EnsureSuccessStatusCode();
@@ -135,7 +60,7 @@ public class AzureDevOpsApiClient : IAzureDevOpsClient
         return (page?.Value ?? new()).Select(p => new AzureDevOpsProjectDto(p.Id, p.Name)).ToList();
     }
 
-    public async Task<IReadOnlyList<AzureDevOpsWorkItemDto>> GetWorkItemsAsync(string accessToken, string organization, string projectName, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<AzureDevOpsWorkItemDto>> GetWorkItemsAsync(string personalAccessToken, string organization, string projectName, CancellationToken cancellationToken = default)
     {
         var org = Uri.EscapeDataString(organization);
         var project = Uri.EscapeDataString(projectName);
@@ -147,7 +72,7 @@ public class AzureDevOpsApiClient : IAzureDevOpsClient
                 query = $"SELECT [System.Id] FROM WorkItems WHERE [System.TeamProject] = '{projectName.Replace("'", "''")}' ORDER BY [System.Id] ASC"
             }, options: JsonOptions),
         };
-        wiqlRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+        wiqlRequest.Headers.Authorization = BasicAuthHeader(personalAccessToken);
 
         using var wiqlResponse = await _httpClient.SendAsync(wiqlRequest, cancellationToken);
         wiqlResponse.EnsureSuccessStatusCode();
@@ -167,7 +92,7 @@ public class AzureDevOpsApiClient : IAzureDevOpsClient
             {
                 Content = JsonContent.Create(new { ids = batchIds, fields = fields.Split(',') }, options: JsonOptions),
             };
-            batchRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+            batchRequest.Headers.Authorization = BasicAuthHeader(personalAccessToken);
 
             using var batchResponse = await _httpClient.SendAsync(batchRequest, cancellationToken);
             batchResponse.EnsureSuccessStatusCode();
@@ -192,7 +117,7 @@ public class AzureDevOpsApiClient : IAzureDevOpsClient
         return results;
     }
 
-    /// <summary>Azure DevOps' description field is HTML, not plain text (unlike Jira's v2 API) — a bare tag-strip is good enough for a readable imported description, not meant to preserve formatting.</summary>
+    /// <summary>Azure DevOps' description field is HTML, not plain text — a bare tag-strip is good enough for a readable imported description, not meant to preserve formatting.</summary>
     private static string? StripHtml(string? html)
     {
         if (string.IsNullOrWhiteSpace(html)) return null;
@@ -202,17 +127,6 @@ public class AzureDevOpsApiClient : IAzureDevOpsClient
     }
 
     // --- Wire DTOs — deliberately kept private to this class; the rest of the app only ever sees IAzureDevOpsClient's own DTOs above. ---
-
-    private record TokenResponse(
-        [property: JsonPropertyName("access_token")] string AccessToken,
-        [property: JsonPropertyName("refresh_token")] string? RefreshToken,
-        [property: JsonPropertyName("expires_in")] int ExpiresIn);
-
-    private record ProfileResponse(string? Id);
-
-    private record AccountsResponse(List<AccountResponse> Value);
-
-    private record AccountResponse([property: JsonPropertyName("accountName")] string AccountName);
 
     private record ProjectPageResponse(List<ProjectResponse> Value);
 

@@ -33,13 +33,10 @@ public class AzureDevOpsConnectionRepository : IAzureDevOpsConnectionRepository
         Id = connection.Id,
         UserId = connection.UserId,
         OrganizationName = connection.OrganizationName,
-        AccessTokenEncrypted = connection.AccessTokenEncrypted,
-        RefreshTokenEncrypted = connection.RefreshTokenEncrypted,
-        AccessTokenExpiresOn = connection.AccessTokenExpiresOn,
+        PersonalAccessTokenEncrypted = connection.PersonalAccessTokenEncrypted,
         ConnectedOn = connection.ConnectedOn,
     };
 
     private static AzureDevOpsConnection ToDomain(AzureDevOpsConnectionDocument document) => AzureDevOpsConnection.Rehydrate(
-        document.Id, document.UserId, document.OrganizationName,
-        document.AccessTokenEncrypted, document.RefreshTokenEncrypted, document.AccessTokenExpiresOn, document.ConnectedOn);
+        document.Id, document.UserId, document.OrganizationName, document.PersonalAccessTokenEncrypted, document.ConnectedOn);
 }

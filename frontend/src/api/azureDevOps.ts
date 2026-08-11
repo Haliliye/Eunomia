@@ -21,18 +21,11 @@ export interface CreateTeamFromAzureDevOpsResult {
 export const azureDevOpsApi = {
   getStatus: () => apiClient.get<AzureDevOpsStatus>('/integrations/azuredevops/status').then((res) => res.data),
 
-  // Returns the URL to redirect the whole page to (Microsoft's sign-in/
-  // consent screen can't run inside our SPA) — the caller does
-  // `window.location.href = authorizationUrl`.
-  connect: () =>
-    apiClient.get<{ authorizationUrl: string }>('/integrations/azuredevops/connect').then((res) => res.data.authorizationUrl),
+  // PAT-based — no redirect, just posts the organization name + token.
+  connect: (organizationName: string, personalAccessToken: string) =>
+    apiClient.post<{ success: boolean; errorMessage?: string }>('/integrations/azuredevops/connect', { organizationName, personalAccessToken }).then((res) => res.data),
 
   disconnect: () => apiClient.delete('/integrations/azuredevops/disconnect'),
-
-  getOrganizations: () => apiClient.get<string[]>('/integrations/azuredevops/organizations').then((res) => res.data),
-
-  setOrganization: (organizationName: string) =>
-    apiClient.put('/integrations/azuredevops/organization', { organizationName }),
 
   getProjects: () => apiClient.get<AzureDevOpsProject[]>('/integrations/azuredevops/projects').then((res) => res.data),
 

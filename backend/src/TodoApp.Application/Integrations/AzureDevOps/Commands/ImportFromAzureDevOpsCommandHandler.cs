@@ -1,22 +1,26 @@
 using MediatR;
-using TodoApp.Application.Integrations.AzureDevOps;
+using TodoApp.Application.Common;
 using TodoApp.Application.UserStories.Commands.ImportUserStories;
+using TodoApp.Domain.Integrations;
 using TodoApp.Domain.Teams;
 
 namespace TodoApp.Application.Integrations.AzureDevOps.Commands;
 
 public class ImportFromAzureDevOpsCommandHandler : IRequestHandler<ImportFromAzureDevOpsCommand, ImportSummaryDto>
 {
-    private readonly AzureDevOpsAccessTokenProvider _accessTokenProvider;
+    private readonly IAzureDevOpsConnectionRepository _connectionRepository;
+    private readonly ITokenCipher _tokenCipher;
     private readonly ITeamRepository _teamRepository;
     private readonly AzureDevOpsProjectImportService _importService;
 
     public ImportFromAzureDevOpsCommandHandler(
-        AzureDevOpsAccessTokenProvider accessTokenProvider,
+        IAzureDevOpsConnectionRepository connectionRepository,
+        ITokenCipher tokenCipher,
         ITeamRepository teamRepository,
         AzureDevOpsProjectImportService importService)
     {
-        _accessTokenProvider = accessTokenProvider;
+        _connectionRepository = connectionRepository;
+        _tokenCipher = tokenCipher;
         _teamRepository = teamRepository;
         _importService = importService;
     }
@@ -27,10 +31,10 @@ public class ImportFromAzureDevOpsCommandHandler : IRequestHandler<ImportFromAzu
             ?? throw new KeyNotFoundException("Team not found.");
         team.EnsureIsOwnerOrAdmin(request.RequestingUserId);
 
-        var (connection, accessToken) = await _accessTokenProvider.GetValidAccessTokenAsync(request.RequestingUserId, cancellationToken);
-        if (string.IsNullOrEmpty(connection.OrganizationName))
-            throw new InvalidOperationException("No Azure DevOps organization selected yet.");
+        var connection = await _connectionRepository.GetByUserIdAsync(request.RequestingUserId, cancellationToken)
+            ?? throw new KeyNotFoundException("Azure DevOps is not connected for this user.");
+        var pat = _tokenCipher.Decrypt(connection.PersonalAccessTokenEncrypted);
 
-        return await _importService.ImportAsync(team, connection.OrganizationName, request.ProjectName, accessToken, request.RequestingUserId, cancellationToken);
+        return await _importService.ImportAsync(team, connection.OrganizationName, request.ProjectName, pat, request.RequestingUserId, cancellationToken);
     }
 }

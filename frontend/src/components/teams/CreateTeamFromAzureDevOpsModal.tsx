@@ -8,7 +8,7 @@ interface CreateTeamFromAzureDevOpsModalProps {
   onClose: () => void
 }
 
-type Step = 'checking' | 'notConnected' | 'noOrganization' | 'project' | 'name' | 'creating' | 'summary'
+type Step = 'checking' | 'notConnected' | 'project' | 'name' | 'creating' | 'summary'
 
 export default function CreateTeamFromAzureDevOpsModal({ onClose }: CreateTeamFromAzureDevOpsModalProps) {
   const navigate = useNavigate()
@@ -26,7 +26,6 @@ export default function CreateTeamFromAzureDevOpsModal({ onClose }: CreateTeamFr
     azureDevOpsApi.getStatus()
       .then((status) => {
         if (!status.isConnected) { setStep('notConnected'); return }
-        if (!status.organizationName) { setStep('noOrganization'); return }
         return azureDevOpsApi.getProjects().then((list) => {
           setProjects(list)
           setStep('project')
@@ -72,18 +71,6 @@ export default function CreateTeamFromAzureDevOpsModal({ onClose }: CreateTeamFr
           <>
             <p style={{ fontSize: 13, marginBottom: 12 }}>
               You need to connect Azure DevOps before you can create a team from a project.
-            </p>
-            <div className="modal-actions">
-              <button className="btn" onClick={onClose}>Cancel</button>
-              <button className="btn btn-primary" onClick={() => { onClose(); navigate('/settings') }}>Go to Settings</button>
-            </div>
-          </>
-        )}
-
-        {step === 'noOrganization' && (
-          <>
-            <p style={{ fontSize: 13, marginBottom: 12 }}>
-              You need to pick an Azure DevOps organization in Settings first.
             </p>
             <div className="modal-actions">
               <button className="btn" onClick={onClose}>Cancel</button>

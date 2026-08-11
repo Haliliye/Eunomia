@@ -1,11 +1,8 @@
 using MediatR;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Options;
 using TodoApp.Api.Common;
 using TodoApp.Application.Integrations.AzureDevOps.Commands;
 using TodoApp.Application.Integrations.AzureDevOps.Queries;
-using TodoApp.Infrastructure.Integrations.AzureDevOps;
 
 namespace TodoApp.Api.Controllers;
 
@@ -14,12 +11,10 @@ namespace TodoApp.Api.Controllers;
 public class AzureDevOpsIntegrationsController : ControllerBase
 {
     private readonly IMediator _mediator;
-    private readonly AzureDevOpsSettings _settings;
 
-    public AzureDevOpsIntegrationsController(IMediator mediator, IOptions<AzureDevOpsSettings> settings)
+    public AzureDevOpsIntegrationsController(IMediator mediator)
     {
         _mediator = mediator;
-        _settings = settings.Value;
     }
 
     [HttpGet("status")]
@@ -29,39 +24,15 @@ public class AzureDevOpsIntegrationsController : ControllerBase
         return Ok(status);
     }
 
-    /// <summary>Returns the URL for the frontend to do a full-page redirect to — the Microsoft sign-in/consent screen can't run inside an XHR or an iframe.</summary>
-    [HttpGet("connect")]
-    public async Task<IActionResult> Connect(CancellationToken cancellationToken)
+    /// <summary>PAT-based (see AzureDevOpsConnection) — no OAuth redirect, just an organization name and a token pasted in from Azure DevOps' own "Personal Access Tokens" settings page.</summary>
+    [HttpPost("connect")]
+    public async Task<IActionResult> Connect([FromBody] ConnectRequest request, CancellationToken cancellationToken)
     {
-        var authorizationUrl = await _mediator.Send(new StartAzureDevOpsConnectionCommand(User.GetUserId()), cancellationToken);
-        return Ok(new { authorizationUrl });
+        var result = await _mediator.Send(new ConnectAzureDevOpsCommand(User.GetUserId(), request.OrganizationName, request.PersonalAccessToken), cancellationToken);
+        return result.Success ? Ok(result) : BadRequest(result);
     }
 
-    /// <summary>
-    /// Microsoft redirects the user's browser here directly — no JWT is sent
-    /// (a plain top-level navigation, not our SPA's authenticated fetch), so
-    /// this must be anonymous. Identity instead comes from the encrypted
-    /// "state" value handed to Microsoft in Connect(). Always ends in a
-    /// redirect back to the frontend, success or failure.
-    /// </summary>
-    [HttpGet("callback")]
-    [AllowAnonymous]
-    public async Task<IActionResult> Callback([FromQuery] string? code, [FromQuery] string? state, [FromQuery] string? error, CancellationToken cancellationToken)
-    {
-        if (!string.IsNullOrEmpty(error) || string.IsNullOrEmpty(code) || string.IsNullOrEmpty(state))
-            return Redirect(BuildFrontendRedirect(success: false, "The Azure DevOps authorization was cancelled or denied."));
-
-        var result = await _mediator.Send(new CompleteAzureDevOpsConnectionCommand(code, state), cancellationToken);
-        return Redirect(BuildFrontendRedirect(result.Success, result.ErrorMessage));
-    }
-
-    private string BuildFrontendRedirect(bool success, string? errorMessage)
-    {
-        var basePath = $"{_settings.FrontendBaseUrl.TrimEnd('/')}/settings";
-        return success
-            ? $"{basePath}?azuredevops=connected"
-            : $"{basePath}?azuredevops=error&message={Uri.EscapeDataString(errorMessage ?? "Unknown error")}";
-    }
+    public record ConnectRequest(string OrganizationName, string PersonalAccessToken);
 
     [HttpDelete("disconnect")]
     public async Task<IActionResult> Disconnect(CancellationToken cancellationToken)
@@ -69,22 +40,6 @@ public class AzureDevOpsIntegrationsController : ControllerBase
         await _mediator.Send(new DisconnectAzureDevOpsCommand(User.GetUserId()), cancellationToken);
         return NoContent();
     }
-
-    [HttpGet("organizations")]
-    public async Task<IActionResult> GetOrganizations(CancellationToken cancellationToken)
-    {
-        var organizations = await _mediator.Send(new GetAzureDevOpsOrganizationsQuery(User.GetUserId()), cancellationToken);
-        return Ok(organizations);
-    }
-
-    [HttpPut("organization")]
-    public async Task<IActionResult> SetOrganization([FromBody] SetOrganizationRequest request, CancellationToken cancellationToken)
-    {
-        await _mediator.Send(new SetAzureDevOpsOrganizationCommand(User.GetUserId(), request.OrganizationName), cancellationToken);
-        return NoContent();
-    }
-
-    public record SetOrganizationRequest(string OrganizationName);
 
     [HttpGet("projects")]
     public async Task<IActionResult> GetProjects(CancellationToken cancellationToken)

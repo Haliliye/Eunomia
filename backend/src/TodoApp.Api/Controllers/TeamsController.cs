@@ -93,7 +93,7 @@ public class TeamsController : ControllerBase
     [HttpGet("{id}/invitations")]
     public async Task<IActionResult> GetInvitations(string id, CancellationToken cancellationToken)
     {
-        var invitations = await _mediator.Send(new GetTeamInvitationsQuery(id), cancellationToken);
+        var invitations = await _mediator.Send(new GetTeamInvitationsQuery(id, User.GetUserId()), cancellationToken);
         return Ok(invitations);
     }
 

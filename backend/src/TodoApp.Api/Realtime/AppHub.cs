@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using TodoApp.Api.Common;
+using TodoApp.Domain.Teams;
 
 namespace TodoApp.Api.Realtime;
 
@@ -13,6 +14,13 @@ namespace TodoApp.Api.Realtime;
 [Authorize]
 public class AppHub : Hub
 {
+    private readonly ITeamRepository _teamRepository;
+
+    public AppHub(ITeamRepository teamRepository)
+    {
+        _teamRepository = teamRepository;
+    }
+
     public override async Task OnConnectedAsync()
     {
         var userId = Context.User?.GetUserId();
@@ -22,7 +30,22 @@ public class AppHub : Hub
         await base.OnConnectedAsync();
     }
 
-    public Task JoinTeam(string teamId) => Groups.AddToGroupAsync(Context.ConnectionId, GroupNames.Team(teamId));
+    /// <summary>
+    /// Previously missing entirely — any authenticated connection could join
+    /// any team's live-update group just by knowing/guessing its id, and
+    /// from then on silently receive that team's board/story change events.
+    /// Only members get to.
+    /// </summary>
+    public async Task JoinTeam(string teamId)
+    {
+        var userId = Context.User?.GetUserId();
+        if (userId is null) return;
+
+        var team = await _teamRepository.GetByIdAsync(teamId);
+        if (team is null || !team.IsMember(userId)) return;
+
+        await Groups.AddToGroupAsync(Context.ConnectionId, GroupNames.Team(teamId));
+    }
 
     public Task LeaveTeam(string teamId) => Groups.RemoveFromGroupAsync(Context.ConnectionId, GroupNames.Team(teamId));
 }

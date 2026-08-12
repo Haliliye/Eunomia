@@ -28,7 +28,7 @@ public class NotificationsController : ControllerBase
     [HttpPut("{id}/read")]
     public async Task<IActionResult> MarkRead(string id, CancellationToken cancellationToken)
     {
-        await _mediator.Send(new MarkNotificationReadCommand(id), cancellationToken);
+        await _mediator.Send(new MarkNotificationReadCommand(id, User.GetUserId()), cancellationToken);
         return NoContent();
     }
 

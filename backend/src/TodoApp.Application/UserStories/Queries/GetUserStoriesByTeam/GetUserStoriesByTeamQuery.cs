@@ -13,6 +13,7 @@ namespace TodoApp.Application.UserStories.Queries.GetUserStoriesByTeam;
 /// </summary>
 public record GetUserStoriesByTeamQuery(
     string TeamId,
+    string RequestingUserId,
     string? Status = null,
     string? Priority = null,
     string? AssigneeId = null,

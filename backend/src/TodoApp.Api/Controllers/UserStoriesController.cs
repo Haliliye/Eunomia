@@ -64,7 +64,7 @@ public class UserStoriesController : ControllerBase
         CancellationToken cancellationToken = default)
     {
         var stories = await _mediator.Send(
-            new GetUserStoriesByTeamQuery(teamId, status, priority, assigneeId, keyword, page, pageSize, showArchived, sprintId, labelId),
+            new GetUserStoriesByTeamQuery(teamId, User.GetUserId(), status, priority, assigneeId, keyword, page, pageSize, showArchived, sprintId, labelId),
             cancellationToken);
 
         return Ok(stories);

@@ -22,7 +22,7 @@ public class CommentsController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetByUserStory([FromQuery] string userStoryId, CancellationToken cancellationToken)
     {
-        var comments = await _mediator.Send(new GetCommentsByUserStoryQuery(userStoryId), cancellationToken);
+        var comments = await _mediator.Send(new GetCommentsByUserStoryQuery(userStoryId, User.GetUserId()), cancellationToken);
         return Ok(comments);
     }
 

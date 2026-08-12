@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 import { azureDevOpsApi, type AzureDevOpsStatus } from '@/api/azureDevOps'
 import { useToast } from '@/context/ToastContext'
+import { useConfirm } from '@/context/ConfirmContext'
 import AzureDevOpsImportModal from './AzureDevOpsImportModal'
 
 export default function AzureDevOpsIntegrationCard() {
   const { showToast } = useToast()
+  const confirm = useConfirm()
   const [status, setStatus] = useState<AzureDevOpsStatus | null>(null)
   const [isLoading, setLoading] = useState(true)
   const [isConnecting, setConnecting] = useState(false)
@@ -38,7 +40,8 @@ export default function AzureDevOpsIntegrationCard() {
   }
 
   const handleDisconnect = async () => {
-    if (!window.confirm('Disconnect Azure DevOps? You can reconnect any time.')) return
+    const ok = await confirm({ title: 'Disconnect Azure DevOps?', description: 'You can reconnect any time.' })
+    if (!ok) return
     try {
       await azureDevOpsApi.disconnect()
       showToast('Azure DevOps disconnected.')

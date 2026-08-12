@@ -236,6 +236,7 @@ if (app.Environment.IsDevelopment())
 app.UseSerilogRequestLogging();
 
 app.UseExceptionHandling();
+app.UseSecurityHeaders();
 
 // Skipped in Development: the Docker Compose setup runs the API over plain
 // HTTP (no self-signed cert wiring inside the container), and redirecting

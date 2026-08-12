@@ -11,6 +11,7 @@ import ImportCsvModal from '@/components/userStories/ImportCsvModal'
 import BulkCreateModal from '@/components/userStories/BulkCreateModal'
 import EditUserStoryModal from '@/components/userStories/EditUserStoryModal'
 import { useToast } from '@/context/ToastContext'
+import { useConfirm } from '@/context/ConfirmContext'
 import { useUserNames } from '@/hooks/useUserNames'
 import { useKeyboardShortcut } from '@/hooks/useKeyboardShortcut'
 import { ensureRealtimeConnectionStarted, getRealtimeConnection } from '@/services/realtimeConnection'
@@ -35,6 +36,7 @@ const PAGE_SIZE = 25
 export default function TeamBacklogPage() {
   const { team } = useOutletContext<TeamOutletContext>()
   const { showToast } = useToast()
+  const confirm = useConfirm()
   const [stories, setStories] = useState<UserStory[]>([])
   const [totalCount, setTotalCount] = useState(0)
   const [page, setPage] = useState(1)
@@ -114,25 +116,21 @@ export default function TeamBacklogPage() {
   }, [team.id])
 
   const handleCreate = async (title: string, description: string, priority?: string, checklistItemTexts?: string[]) => {
-    try {
-      const story = await userStoriesApi.create(team.id, title, description || undefined)
+    const story = await userStoriesApi.create(team.id, title, description || undefined)
 
-      if (priority) {
-        await userStoriesApi.changePriority(story.id, priority as UserStoryPriority)
-      }
-      if (checklistItemTexts && checklistItemTexts.length > 0) {
-        for (const text of checklistItemTexts) {
-          await userStoriesApi.addChecklistItem(story.id, text)
-        }
-      }
-
-      await refetchStories()
-      setCreateOpen(false)
-      setError(null)
-      showToast(`"${title}" was created.`)
-    } catch (err) {
-      setError(extractErrorMessage(err))
+    if (priority) {
+      await userStoriesApi.changePriority(story.id, priority as UserStoryPriority)
     }
+    if (checklistItemTexts && checklistItemTexts.length > 0) {
+      for (const text of checklistItemTexts) {
+        await userStoriesApi.addChecklistItem(story.id, text)
+      }
+    }
+
+    await refetchStories()
+    setCreateOpen(false)
+    setError(null)
+    showToast(`"${title}" was created.`)
   }
 
   const handleSaveEdit = async (title: string, description: string, dueDate: string | undefined, storyPoints: number | undefined) => {
@@ -164,13 +162,14 @@ export default function TeamBacklogPage() {
       await refetchStories()
       setBulkCreateOpen(false)
       showToast(`${titles.length} ${titles.length === 1 ? 'story' : 'stories'} created.`)
-    } catch {
+    } catch (err) {
       showToast('Could not create those stories.', 'error')
+      throw err
     }
   }
 
   const handleDeleteStory = async (story: UserStory) => {
-    const confirmed = window.confirm(`Delete "${story.title}"?`)
+    const confirmed = await confirm({ title: `Delete "${story.title}"?`, confirmLabel: 'Delete', danger: true })
     if (!confirmed) return
 
     try {
@@ -241,7 +240,7 @@ export default function TeamBacklogPage() {
   const handleBulkArchive = async () => {
     const ids = Array.from(selectedIds)
     if (ids.length === 0) return
-    const confirmed = window.confirm(`Archive ${ids.length} selected stories?`)
+    const confirmed = await confirm({ title: `Archive ${ids.length} selected stories?`, confirmLabel: 'Archive' })
     if (!confirmed) return
 
     const results = await Promise.allSettled(ids.map((id) => userStoriesApi.archive(id)))

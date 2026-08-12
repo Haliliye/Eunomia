@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 import { integrationsApi, type JiraStatus } from '@/api/integrations'
 import { useToast } from '@/context/ToastContext'
+import { useConfirm } from '@/context/ConfirmContext'
 import JiraImportModal from './JiraImportModal'
 
 export default function JiraIntegrationCard() {
   const { showToast } = useToast()
+  const confirm = useConfirm()
   const [status, setStatus] = useState<JiraStatus | null>(null)
   const [isLoading, setLoading] = useState(true)
   const [isConnecting, setConnecting] = useState(false)
@@ -46,7 +48,8 @@ export default function JiraIntegrationCard() {
   }
 
   const handleDisconnect = async () => {
-    if (!window.confirm('Disconnect Jira? You can reconnect any time.')) return
+    const ok = await confirm({ title: 'Disconnect Jira?', description: 'You can reconnect any time.' })
+    if (!ok) return
     try {
       await integrationsApi.disconnectJira()
       showToast('Jira disconnected.')

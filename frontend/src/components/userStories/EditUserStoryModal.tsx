@@ -26,6 +26,7 @@ export default function EditUserStoryModal({ story, members, labels, userNames, 
   const [dueDate, setDueDate] = useState(story?.dueDate?.slice(0, 10) ?? '')
   const [storyPoints, setStoryPoints] = useState(story?.storyPoints?.toString() ?? '')
   const [error, setError] = useState<string | null>(null)
+  const [hasSubmitted, setHasSubmitted] = useState(false)
 
   useEscapeToClose(Boolean(story), onClose)
   const containerRef = useFocusTrap(Boolean(story))
@@ -33,6 +34,7 @@ export default function EditUserStoryModal({ story, members, labels, userNames, 
   if (!story) return null
 
   const handleSubmit = () => {
+    if (hasSubmitted) return // guards against a double-click submitting twice — onSave has no promise to await here, so this is a simple time-boxed guard rather than a true pending state
     if (!title.trim()) {
       setError('Title is required.')
       return
@@ -43,7 +45,9 @@ export default function EditUserStoryModal({ story, members, labels, userNames, 
       return
     }
 
+    setHasSubmitted(true)
     onSave(title.trim(), description.trim(), dueDate || undefined, points)
+    setTimeout(() => setHasSubmitted(false), 1500) // resets in case save fails and the modal stays open
   }
 
   const handleToggleLabel = async (labelId: string) => {
@@ -135,7 +139,7 @@ export default function EditUserStoryModal({ story, members, labels, userNames, 
 
         <div className="modal-footer">
           <button className="btn" onClick={onClose}>Cancel</button>
-          <button className="btn btn-primary" onClick={handleSubmit}>Save changes</button>
+          <button className="btn btn-primary" onClick={handleSubmit} disabled={hasSubmitted}>Save changes</button>
         </div>
 
         <div className="card" style={{ marginTop: 20, marginBottom: 0, background: 'var(--color-surface-sunken)' }}>

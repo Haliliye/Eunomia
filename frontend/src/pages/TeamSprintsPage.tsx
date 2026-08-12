@@ -3,6 +3,7 @@ import { useOutletContext } from 'react-router-dom'
 import { sprintsApi } from '@/api/sprints'
 import type { Sprint } from '@/types/sprint'
 import { useToast } from '@/context/ToastContext'
+import { useConfirm } from '@/context/ConfirmContext'
 import type { TeamOutletContext } from './TeamShellPage'
 
 const STATUS_CLASS: Record<Sprint['status'], string> = {
@@ -21,6 +22,7 @@ function defaultDates() {
 export default function TeamSprintsPage() {
   const { team } = useOutletContext<TeamOutletContext>()
   const { showToast } = useToast()
+  const confirm = useConfirm()
   const [sprints, setSprints] = useState<Sprint[]>([])
   const [isLoading, setLoading] = useState(true)
   const [isCreateOpen, setCreateOpen] = useState(false)
@@ -63,9 +65,11 @@ export default function TeamSprintsPage() {
   }
 
   const handleComplete = async (sprint: Sprint) => {
-    const confirmed = window.confirm(
-      `Complete "${sprint.name}"? Any stories not marked Done will move back to the backlog.`
-    )
+    const confirmed = await confirm({
+      title: `Complete "${sprint.name}"?`,
+      description: 'Any stories not marked Done will move back to the backlog.',
+      confirmLabel: 'Complete',
+    })
     if (!confirmed) return
 
     try {

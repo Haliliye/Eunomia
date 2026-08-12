@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { Team, Label } from '@/types/team'
 import { teamsApi } from '@/api/teams'
 import { useToast } from '@/context/ToastContext'
+import { useConfirm } from '@/context/ConfirmContext'
 import LabelChip from '@/components/common/LabelChip'
 
 const DEFAULT_COLORS = ['#0B6E63', '#7C4DBD', '#2B6CB5', '#B48A0A', '#C23B6B', '#B3261E', '#2F6F4E']
@@ -14,6 +15,7 @@ interface LabelManagerProps {
 
 export default function LabelManager({ team, isOwner, onChanged }: LabelManagerProps) {
   const { showToast } = useToast()
+  const confirm = useConfirm()
   const [name, setName] = useState('')
   const [color, setColor] = useState(DEFAULT_COLORS[0])
 
@@ -30,7 +32,12 @@ export default function LabelManager({ team, isOwner, onChanged }: LabelManagerP
   }
 
   const handleDelete = async (label: Label) => {
-    const confirmed = window.confirm(`Delete the "${label.name}" label? It will be removed from every story that has it.`)
+    const confirmed = await confirm({
+      title: `Delete the "${label.name}" label?`,
+      description: 'It will be removed from every story that has it.',
+      confirmLabel: 'Delete',
+      danger: true,
+    })
     if (!confirmed) return
 
     try {

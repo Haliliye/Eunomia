@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { boardsApi, type Board } from '@/api/boards'
 import type { Sprint } from '@/types/sprint'
 import { useToast } from '@/context/ToastContext'
+import { useConfirm } from '@/context/ConfirmContext'
 import { useEscapeToClose } from '@/hooks/useEscapeToClose'
 import { useFocusTrap } from '@/hooks/useFocusTrap'
 
@@ -74,6 +75,7 @@ interface BoardEditModalProps {
 
 function BoardEditModal({ teamId, board, sprints, onClose, onSaved }: BoardEditModalProps) {
   const { showToast } = useToast()
+  const confirm = useConfirm()
   const [name, setName] = useState(board?.name ?? '')
   const [sprintId, setSprintId] = useState(board?.sprintId ?? '')
   const [isSaving, setSaving] = useState(false)
@@ -100,7 +102,13 @@ function BoardEditModal({ teamId, board, sprints, onClose, onSaved }: BoardEditM
 
   const handleDelete = async () => {
     if (!board) return
-    if (!window.confirm(`Delete the "${board.name}" board? This only removes the saved view — its stories aren't affected.`)) return
+    const ok = await confirm({
+      title: `Delete the "${board.name}" board?`,
+      description: "This only removes the saved view — its stories aren't affected.",
+      confirmLabel: 'Delete',
+      danger: true,
+    })
+    if (!ok) return
     setSaving(true)
     try {
       await boardsApi.delete(board.id)

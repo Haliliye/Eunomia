@@ -5,17 +5,23 @@ import type { PersonalTask } from '@/types/personalTask'
 import type { Team } from '@/types/team'
 import { useToast } from '@/context/ToastContext'
 import { SkeletonTable } from '@/components/common/Skeleton'
+import { useEscapeToClose } from '@/hooks/useEscapeToClose'
+import { useFocusTrap } from '@/hooks/useFocusTrap'
+import { useConfirm } from '@/context/ConfirmContext'
 
 // US-140/141: a private to-do list outside any team — never shown on a team
 // board, only ever visible to its owner.
 export default function MyTasksPage() {
   const { showToast } = useToast()
+  const confirm = useConfirm()
   const [tasks, setTasks] = useState<PersonalTask[]>([])
   const [myTeams, setMyTeams] = useState<Team[]>([])
   const [isLoading, setLoading] = useState(true)
   const [title, setTitle] = useState('')
   const [dueDate, setDueDate] = useState('')
   const [convertingTaskId, setConvertingTaskId] = useState<string | null>(null)
+  useEscapeToClose(convertingTaskId !== null, () => setConvertingTaskId(null))
+  const convertModalRef = useFocusTrap(convertingTaskId !== null)
   const [convertTeamId, setConvertTeamId] = useState('')
 
   const load = () => {
@@ -49,7 +55,7 @@ export default function MyTasksPage() {
   }
 
   const handleDelete = async (task: PersonalTask) => {
-    const confirmed = window.confirm(`Delete "${task.title}"?`)
+    const confirmed = await confirm({ title: `Delete "${task.title}"?`, confirmLabel: 'Delete', danger: true })
     if (!confirmed) return
     try {
       await personalTasksApi.delete(task.id)
@@ -121,7 +127,7 @@ export default function MyTasksPage() {
 
       {convertingTaskId && (
         <div className="modal-overlay" onClick={() => setConvertingTaskId(null)}>
-          <div className="modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+          <div className="modal" ref={convertModalRef} role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
             <h2>Convert to a team user story</h2>
             <p style={{ fontSize: 13, marginBottom: 8 }}>Only teams you're a member of are shown.</p>
             <select className="pill-select" value={convertTeamId} onChange={(e) => setConvertTeamId(e.target.value)} style={{ width: '100%' }}>

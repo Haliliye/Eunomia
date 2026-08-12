@@ -16,11 +16,13 @@ import { SkeletonBoard } from '@/components/common/Skeleton'
 import { ensureRealtimeConnectionStarted, getRealtimeConnection } from '@/services/realtimeConnection'
 import { useUserNames } from '@/hooks/useUserNames'
 import { useToast } from '@/context/ToastContext'
+import { useConfirm } from '@/context/ConfirmContext'
 import type { TeamOutletContext } from './TeamShellPage'
 
 export default function BoardPage() {
   const { team, reloadTeam } = useOutletContext<TeamOutletContext>()
   const { showToast } = useToast()
+  const confirm = useConfirm()
   const [stories, setStories] = useState<UserStory[]>([])
   const [isLoading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -70,7 +72,7 @@ export default function BoardPage() {
     // The board shows the whole backlog at once (no pagination UI), so we
     // request a generously large page. A truly huge backlog would need
     // per-column virtualization instead — out of scope for this skeleton.
-    userStoriesApi.getByTeam(team.id, {}, 1, 500, false, sprintFilter || undefined).then((result) => setStories(result.items))
+    return userStoriesApi.getByTeam(team.id, {}, 1, 500, false, sprintFilter || undefined).then((result) => setStories(result.items))
   }
 
   useEffect(() => {
@@ -81,8 +83,10 @@ export default function BoardPage() {
 
   useEffect(() => {
     setLoading(true)
-    loadStories()
-    setLoading(false)
+    // Previously called setLoading(false) right after firing the request,
+    // not after it resolved — the skeleton would disappear before any data
+    // had actually arrived, showing an empty board for a flash.
+    loadStories().finally(() => setLoading(false))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [team.id, sprintFilter])
 
@@ -202,10 +206,11 @@ export default function BoardPage() {
   }
 
   const handleDeleteColumn = async (columnKey: string) => {
-    const warning = columnKey === 'Done'
-      ? 'Delete this column? Any stories still in it need to be moved first. This is also your "Done" column — removing it means sprint burndown, velocity, and the dashboard\'s open/closed split will no longer recognize any story as complete.'
-      : 'Delete this column? Any stories still in it need to be moved first.'
-    if (!window.confirm(warning)) return
+    const description = columnKey === 'Done'
+      ? 'Any stories still in it need to be moved first. This is also your "Done" column — removing it means sprint burndown, velocity, and the dashboard\'s open/closed split will no longer recognize any story as complete.'
+      : 'Any stories still in it need to be moved first.'
+    const confirmed = await confirm({ title: 'Delete this column?', description, confirmLabel: 'Delete', danger: true })
+    if (!confirmed) return
     try {
       await teamsApi.removeColumn(team.id, columnKey)
       reloadTeam()

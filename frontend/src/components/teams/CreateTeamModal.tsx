@@ -5,20 +5,21 @@ import { useFocusTrap } from '@/hooks/useFocusTrap'
 interface CreateTeamModalProps {
   isOpen: boolean
   onClose: () => void
-  onCreate: (name: string, description: string) => void
+  onCreate: (name: string, description: string) => Promise<void>
 }
 
 export default function CreateTeamModal({ isOpen, onClose, onCreate }: CreateTeamModalProps) {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [isSaving, setSaving] = useState(false)
 
   useEscapeToClose(isOpen, onClose)
   const containerRef = useFocusTrap(isOpen)
 
   if (!isOpen) return null
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!name.trim()) {
       setError('Team name is required.')
       return
@@ -28,10 +29,19 @@ export default function CreateTeamModal({ isOpen, onClose, onCreate }: CreateTea
       return
     }
 
-    onCreate(name.trim(), description.trim())
-    setName('')
-    setDescription('')
+    setSaving(true)
     setError(null)
+    try {
+      await onCreate(name.trim(), description.trim())
+      // Only clear once the team is actually created — clearing before this
+      // point meant a failed request silently threw away what was typed.
+      setName('')
+      setDescription('')
+    } catch (err: any) {
+      setError(err?.response?.data?.error ?? "Couldn't create the team. Please try again.")
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -52,8 +62,10 @@ export default function CreateTeamModal({ isOpen, onClose, onCreate }: CreateTea
         {error && <p className="field-error" role="alert">{error}</p>}
 
         <div className="modal-footer">
-          <button className="btn" onClick={onClose}>Cancel</button>
-          <button className="btn btn-primary" onClick={handleSubmit}>Create team</button>
+          <button className="btn" onClick={onClose} disabled={isSaving}>Cancel</button>
+          <button className="btn btn-primary" onClick={handleSubmit} disabled={isSaving}>
+            {isSaving ? 'Creating…' : 'Create team'}
+          </button>
         </div>
       </div>
     </div>

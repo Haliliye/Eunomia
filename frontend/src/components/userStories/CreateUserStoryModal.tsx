@@ -7,7 +7,7 @@ interface CreateUserStoryModalProps {
   isOpen: boolean
   templates?: StoryTemplate[]
   onClose: () => void
-  onCreate: (title: string, description: string, priority?: string, checklistItemTexts?: string[]) => void
+  onCreate: (title: string, description: string, priority?: string, checklistItemTexts?: string[]) => Promise<void>
 }
 
 export default function CreateUserStoryModal({ isOpen, templates, onClose, onCreate }: CreateUserStoryModalProps) {
@@ -15,6 +15,7 @@ export default function CreateUserStoryModal({ isOpen, templates, onClose, onCre
   const [description, setDescription] = useState('')
   const [templateId, setTemplateId] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [isSaving, setSaving] = useState(false)
 
   useEscapeToClose(isOpen, onClose)
   const containerRef = useFocusTrap(isOpen)
@@ -29,7 +30,7 @@ export default function CreateUserStoryModal({ isOpen, templates, onClose, onCre
     }
   }
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!title.trim()) {
       setError('Title is required.')
       return
@@ -44,11 +45,20 @@ export default function CreateUserStoryModal({ isOpen, templates, onClose, onCre
     }
 
     const template = templates?.find((t) => t.id === templateId)
-    onCreate(title.trim(), description.trim(), template?.defaultPriority, template?.checklistItemTexts)
-    setTitle('')
-    setDescription('')
-    setTemplateId('')
+    setSaving(true)
     setError(null)
+    try {
+      await onCreate(title.trim(), description.trim(), template?.defaultPriority, template?.checklistItemTexts)
+      // Only clear once the story is actually created — clearing before this
+      // point meant a failed request silently threw away what was typed.
+      setTitle('')
+      setDescription('')
+      setTemplateId('')
+    } catch (err: any) {
+      setError(err?.response?.data?.error ?? "Couldn't create the story. Please try again.")
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -81,8 +91,10 @@ export default function CreateUserStoryModal({ isOpen, templates, onClose, onCre
         {error && <p className="field-error" role="alert">{error}</p>}
 
         <div className="modal-footer">
-          <button className="btn" onClick={onClose}>Cancel</button>
-          <button className="btn btn-primary" onClick={handleSubmit}>Create story</button>
+          <button className="btn" onClick={onClose} disabled={isSaving}>Cancel</button>
+          <button className="btn btn-primary" onClick={handleSubmit} disabled={isSaving}>
+            {isSaving ? 'Creating…' : 'Create story'}
+          </button>
         </div>
       </div>
     </div>

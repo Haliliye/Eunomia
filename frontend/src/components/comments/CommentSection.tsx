@@ -6,6 +6,7 @@ import CommentList from './CommentList'
 import CommentForm from './CommentForm'
 import { useAuth } from '@/context/AuthContext'
 import { useToast } from '@/context/ToastContext'
+import { useConfirm } from '@/context/ConfirmContext'
 
 interface CommentSectionProps {
   userStoryId: string
@@ -16,6 +17,7 @@ interface CommentSectionProps {
 export default function CommentSection({ userStoryId, members, userNames }: CommentSectionProps) {
   const { user } = useAuth()
   const { showToast } = useToast()
+  const confirm = useConfirm()
   const [comments, setComments] = useState<Comment[]>([])
   const [isLoading, setLoading] = useState(true)
 
@@ -40,7 +42,7 @@ export default function CommentSection({ userStoryId, members, userNames }: Comm
   }
 
   const handleDelete = async (comment: Comment) => {
-    const confirmed = window.confirm('Delete this comment?')
+    const confirmed = await confirm({ title: 'Delete this comment?', confirmLabel: 'Delete', danger: true })
     if (!confirmed) return
 
     try {

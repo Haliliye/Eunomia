@@ -7,6 +7,8 @@ import type { Sprint } from '@/types/sprint'
 import { isOverdue } from '@/lib/dueDate'
 import { ticketCode } from '@/lib/ticketCode'
 import { Skeleton } from '@/components/common/Skeleton'
+import { useEscapeToClose } from '@/hooks/useEscapeToClose'
+import { useFocusTrap } from '@/hooks/useFocusTrap'
 import type { TeamOutletContext } from './TeamShellPage'
 
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
@@ -34,6 +36,8 @@ export default function CalendarPage() {
   const [activeSprint, setActiveSprint] = useState<Sprint | null>(null)
   const [isLoading, setLoading] = useState(true)
   const [selectedDay, setSelectedDay] = useState<Date | null>(null)
+  useEscapeToClose(selectedDay !== null, () => setSelectedDay(null))
+  const dayModalRef = useFocusTrap(selectedDay !== null)
 
   useEffect(() => {
     setLoading(true)
@@ -169,7 +173,7 @@ export default function CalendarPage() {
 
       {selectedDay && (
         <div className="modal-overlay" onClick={() => setSelectedDay(null)}>
-          <div className="modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+          <div className="modal" ref={dayModalRef} role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
             <h2>{selectedDay.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}</h2>
             {selectedStories.length === 0 ? (
               <p style={{ fontSize: 13 }}>Nothing due this day.</p>

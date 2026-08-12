@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import type { Attachment } from '@/types/userStory'
 import { userStoriesApi } from '@/api/userStories'
 import { useToast } from '@/context/ToastContext'
+import { useConfirm } from '@/context/ConfirmContext'
 import { displayNameOrId } from '@/hooks/useUserNames'
 
 interface AttachmentsProps {
@@ -26,6 +27,7 @@ function isPreviewable(contentType: string): boolean {
 // US-134/135/136: upload, preview/download, and remove attachments.
 export default function Attachments({ userStoryId, attachments, userNames, onChange }: AttachmentsProps) {
   const { showToast } = useToast()
+  const confirm = useConfirm()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [isUploading, setUploading] = useState(false)
 
@@ -71,7 +73,7 @@ export default function Attachments({ userStoryId, attachments, userNames, onCha
   }
 
   const handleRemove = async (attachment: Attachment) => {
-    const confirmed = window.confirm(`Remove "${attachment.fileName}"?`)
+    const confirmed = await confirm({ title: `Remove "${attachment.fileName}"?`, confirmLabel: 'Remove', danger: true })
     if (!confirmed) return
 
     try {

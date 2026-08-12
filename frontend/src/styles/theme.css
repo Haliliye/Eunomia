@@ -512,7 +512,11 @@ select option {
   opacity: 0;
   transition: opacity 0.12s ease;
 }
-.team-tile:hover .team-tile-delete { opacity: 1; }
+/* :focus-within (not just :hover) so keyboard-only and touch users can
+   reach this without a mouse — Tab-ing onto the button itself reveals it,
+   same as hovering the card does. */
+.team-tile:hover .team-tile-delete,
+.team-tile:focus-within .team-tile-delete { opacity: 1; }
 
 /* ==========================================================================
    Empty state
@@ -1274,7 +1278,8 @@ select option {
   opacity: 0;
   transition: opacity 0.1s ease;
 }
-.backlog-row:hover .backlog-row-actions { opacity: 1; }
+.backlog-row:hover .backlog-row-actions,
+.backlog-row:focus-within .backlog-row-actions { opacity: 1; }
 
 /* ==========================================================================
    Team tab bar (Jira-style top nav within a team)

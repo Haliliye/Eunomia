@@ -29,11 +29,11 @@ namespace TodoApp.IntegrationTests;
 // connection string is available.
 public class AuthFlowTests : IDisposable
 {
-    private readonly Factory _factory;
+    private readonly ApiFactory _factory;
 
     public AuthFlowTests(MongoFixture mongoFixture)
     {
-        _factory = new Factory(mongoFixture.ConnectionString);
+        _factory = new ApiFactory(mongoFixture.ConnectionString, "todoapp_authflow_tests");
     }
 
     public void Dispose() => _factory.Dispose();
@@ -151,47 +151,5 @@ public class AuthFlowTests : IDisposable
         var client = _factory.CreateClient();
         var response = await client.GetAsync("/api/users/me/notification-preferences");
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
-    }
-
-    /// <summary>Points the real app's configuration at the shared Testcontainers
-    /// Mongo instance (own database name) instead of whatever's in
-    /// appsettings.json, and supplies a Jwt secret + writable attachment
-    /// storage path so the app can actually start under test.</summary>
-    public class Factory : WebApplicationFactory<Program>
-    {
-        private readonly string _mongoConnectionString;
-        private readonly string _attachmentStorageRoot = Path.Combine(Path.GetTempPath(), $"todoapp-attachments-test-{Guid.NewGuid():N}");
-
-        public Factory(string mongoConnectionString)
-        {
-            _mongoConnectionString = mongoConnectionString;
-        }
-
-        protected override void ConfigureWebHost(IWebHostBuilder builder)
-        {
-            builder.UseEnvironment("Development");
-
-            builder.ConfigureAppConfiguration((_, config) =>
-            {
-                config.AddInMemoryCollection(new Dictionary<string, string?>
-                {
-                    ["MongoDb:ConnectionString"] = _mongoConnectionString,
-                    ["MongoDb:DatabaseName"] = $"todoapp_authflow_tests_{Guid.NewGuid():N}",
-                    ["Jwt:SecretKey"] = "integration-test-secret-key-at-least-32-chars-long",
-                    ["Jwt:Issuer"] = "TodoApp",
-                    ["Jwt:Audience"] = "TodoAppClient",
-                    ["Jwt:ExpiryMinutes"] = "15",
-                    ["Jwt:RefreshTokenExpiryDays"] = "30",
-                    ["AttachmentStorage:RootPath"] = _attachmentStorageRoot,
-                });
-            });
-        }
-
-        protected override void Dispose(bool disposing)
-        {
-            base.Dispose(disposing);
-            if (Directory.Exists(_attachmentStorageRoot))
-                Directory.Delete(_attachmentStorageRoot, recursive: true);
-        }
     }
 }

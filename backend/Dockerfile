@@ -26,6 +26,16 @@ FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
 WORKDIR /app
 COPY --from=build /app .
 
+# Runs as a non-root user — defense in depth, so a code-execution bug in the
+# app doesn't hand an attacker root inside the container. The copied files
+# (and the logs/ directory Serilog's file sink writes to, created here since
+# it wouldn't otherwise exist until the app starts) need to be owned by that
+# user, not root, or the app can't read/write them after USER switches below.
+RUN useradd --create-home --shell /bin/bash appuser \
+    && mkdir -p /app/logs \
+    && chown -R appuser:appuser /app
+USER appuser
+
 # Fixed container-internal port — Render (and most container platforms)
 # detect this via EXPOSE and route external traffic to it, regardless of
 # whatever public port the platform itself uses. ASPNETCORE_HTTP_PORTS is

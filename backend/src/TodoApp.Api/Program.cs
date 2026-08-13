@@ -62,8 +62,17 @@ if (!string.IsNullOrEmpty(platformPort))
 builder.Host.UseSerilog((context, services, configuration) => configuration
     .ReadFrom.Configuration(context.Configuration)
     .ReadFrom.Services(services)
-    .WriteTo.Console()
-    .WriteTo.File("logs/todoapp-.log", rollingInterval: RollingInterval.Day));
+    // Required for CorrelationIdMiddleware's LogContext.PushProperty to
+    // actually reach the log output — without this, the property is pushed
+    // but every sink ignores it.
+    .Enrich.FromLogContext()
+    // {Properties:j} renders whatever's been enriched (CorrelationId while
+    // handling a request; nothing for background-service logs) as compact
+    // JSON — safe either way, unlike referencing {CorrelationId} directly
+    // which would render oddly for logs outside a request.
+    .WriteTo.Console(outputTemplate: "{Timestamp:HH:mm:ss} [{Level:u3}] {Message:lj} {Properties:j}{NewLine}{Exception}")
+    .WriteTo.File("logs/todoapp-.log", rollingInterval: RollingInterval.Day,
+        outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {Message:lj} {Properties:j}{NewLine}{Exception}"));
 
 // CQRS/MediatR + FluentValidation registrations live in Application.
 builder.Services.AddApplication();
@@ -233,6 +242,10 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+// CorrelationId first — LogContext.PushProperty needs to wrap
+// UseSerilogRequestLogging's own completion-log emission too, not just the
+// inner pipeline, otherwise that summary line won't carry the id.
+app.UseCorrelationId();
 app.UseSerilogRequestLogging();
 
 app.UseExceptionHandling();

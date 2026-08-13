@@ -28,25 +28,44 @@ public class ExceptionHandlingMiddleware
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unhandled exception while processing {Path}", context.Request.Path);
+            var correlationId = context.GetCorrelationId();
+            _logger.LogError(ex, "Unhandled exception while processing {Path} (CorrelationId: {CorrelationId})", context.Request.Path, correlationId);
 
-            var (statusCode, message) = ex switch
+            var (statusCode, title, message) = ex switch
             {
                 ValidationException validationEx => (
                     HttpStatusCode.BadRequest,
+                    "Validation failed",
                     string.Join(" ", validationEx.Errors.Select(e => e.ErrorMessage))),
-                AuthenticationFailedException => (HttpStatusCode.Unauthorized, ex.Message),
-                ConcurrencyConflictException => (HttpStatusCode.Conflict, ex.Message),
-                KeyNotFoundException => (HttpStatusCode.NotFound, ex.Message),
-                UnauthorizedAccessException => (HttpStatusCode.Forbidden, ex.Message),
-                ArgumentException => (HttpStatusCode.BadRequest, ex.Message),
-                InvalidOperationException => (HttpStatusCode.BadRequest, ex.Message),
-                _ => (HttpStatusCode.InternalServerError, "An unexpected error occurred.")
+                AuthenticationFailedException => (HttpStatusCode.Unauthorized, "Authentication failed", ex.Message),
+                ConcurrencyConflictException => (HttpStatusCode.Conflict, "Concurrency conflict", ex.Message),
+                KeyNotFoundException => (HttpStatusCode.NotFound, "Not found", ex.Message),
+                UnauthorizedAccessException => (HttpStatusCode.Forbidden, "Forbidden", ex.Message),
+                ArgumentException => (HttpStatusCode.BadRequest, "Invalid request", ex.Message),
+                InvalidOperationException => (HttpStatusCode.BadRequest, "Invalid request", ex.Message),
+                _ => (HttpStatusCode.InternalServerError, "An unexpected error occurred", "An unexpected error occurred.")
             };
 
-            context.Response.ContentType = "application/json";
+            // RFC 7807 (application/problem+json) shape — type/title/status/
+            // detail/instance are the standard fields — plus a correlationId
+            // extension member so a support conversation can reference one
+            // id that also appears throughout the server logs for this
+            // request. `error` is kept alongside for backward compatibility:
+            // the frontend already reads response.data.error everywhere, and
+            // migrating every one of those call sites isn't worth doing in
+            // the same change as adding the standard shape.
+            context.Response.ContentType = "application/problem+json";
             context.Response.StatusCode = (int)statusCode;
-            await context.Response.WriteAsJsonAsync(new { error = message });
+            await context.Response.WriteAsJsonAsync(new
+            {
+                type = $"https://httpstatuses.com/{(int)statusCode}",
+                title,
+                status = (int)statusCode,
+                detail = message,
+                instance = context.Request.Path.Value,
+                correlationId,
+                error = message,
+            });
         }
     }
 }

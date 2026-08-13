@@ -9,6 +9,9 @@ namespace TodoApp.Domain.Comments;
 /// </summary>
 public class Comment : AggregateRoot
 {
+    /// <summary>Generous enough for any real discussion, small enough that a comment can't be used to stash an arbitrarily large blob of text (storage growth, list-rendering cost).</summary>
+    public const int MaxContentLength = 10_000;
+
     public string UserStoryId { get; private set; } = string.Empty;
     public string AuthorId { get; private set; } = string.Empty;
     public string Content { get; private set; } = string.Empty;
@@ -32,6 +35,8 @@ public class Comment : AggregateRoot
     {
         if (string.IsNullOrWhiteSpace(content))
             throw new ArgumentException("Comment cannot be empty.", nameof(content));
+        if (content.Length > MaxContentLength)
+            throw new ArgumentException($"Comment cannot exceed {MaxContentLength} characters.", nameof(content));
 
         var comment = new Comment(id, userStoryId, authorId, content.Trim(), mentionedUserIds);
 
@@ -60,6 +65,8 @@ public class Comment : AggregateRoot
     {
         if (string.IsNullOrWhiteSpace(content))
             throw new ArgumentException("Comment cannot be empty.", nameof(content));
+        if (content.Length > MaxContentLength)
+            throw new ArgumentException($"Comment cannot exceed {MaxContentLength} characters.", nameof(content));
 
         Content = content.Trim();
         MentionedUserIds = mentionedUserIds.ToList();

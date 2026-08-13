@@ -11,4 +11,5 @@ public class RefreshTokenDocument
     public DateTime ExpiresOn { get; set; }
     public DateTime CreatedOn { get; set; }
     public DateTime? RevokedOn { get; set; }
+    public string FamilyId { get; set; } = string.Empty;
 }

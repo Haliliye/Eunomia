@@ -75,6 +75,7 @@ export default function CommentForm({ members, userNames, onSubmit }: CommentFor
           if (e.key === 'Escape') setMentionQuery(null)
         }}
         placeholder="Add a comment… (type @ to mention someone, Markdown supported)"
+        maxLength={10000}
         style={{ minHeight: 56 }}
       />
 

@@ -8,6 +8,7 @@ using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Serilog;
 using TodoApp.Api.BackgroundServices;
+using TodoApp.Api.Common;
 using TodoApp.Api.HealthChecks;
 using TodoApp.Api.Middleware;
 using TodoApp.Api.Realtime;
@@ -149,9 +150,13 @@ builder.Services.AddAuthorization(options =>
         .Build();
 });
 
-// Rate limiting on auth endpoints specifically — login/register/refresh had
-// zero brute-force protection before this. Keyed per client IP so one
-// attacker can't exhaust the limit for everyone else.
+// Rate limiting: a stricter named policy on auth endpoints specifically
+// (login/register/refresh had zero brute-force protection before this),
+// plus a generous global limiter across the whole API (previously nothing
+// outside auth was rate-limited at all — a single client could otherwise
+// hammer any endpoint without limit). Keyed per authenticated user id where
+// available, falling back to client IP for anonymous requests, so one
+// attacker/misbehaving client can't exhaust the limit for everyone else.
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
@@ -164,6 +169,23 @@ builder.Services.AddRateLimiter(options =>
             Window = TimeSpan.FromMinutes(1),
             QueueLimit = 0,
         }));
+
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
+    {
+        var partitionKey = httpContext.User.Identity?.IsAuthenticated == true
+            ? $"user:{httpContext.User.GetUserId()}"
+            : $"ip:{httpContext.Connection.RemoteIpAddress}";
+
+        return RateLimitPartition.GetFixedWindowLimiter(partitionKey, _ => new FixedWindowRateLimiterOptions
+        {
+            // Generous enough that no normal usage pattern (board polling,
+            // rapid filtering, bulk actions) should ever hit it — this is a
+            // backstop against scripted abuse, not a throttle on real use.
+            PermitLimit = 300,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0,
+        });
+    });
 });
 
 builder.Services.AddControllers();
@@ -286,9 +308,12 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseCors();
-app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
+// After auth, not before — the global limiter's partition key checks
+// HttpContext.User.Identity.IsAuthenticated to key by user id instead of
+// IP; that claim only exists once UseAuthentication has actually run.
+app.UseRateLimiter();
 app.MapControllers();
 app.MapHub<AppHub>("/hubs/app");
 // AllowAnonymous is required here — the global FallbackPolicy above makes

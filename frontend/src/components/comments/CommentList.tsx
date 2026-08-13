@@ -62,6 +62,7 @@ export default function CommentList({ comments, userNames, currentUserId, onEdit
                 className="textarea"
                 value={editContent}
                 onChange={(e) => setEditContent(e.target.value)}
+                maxLength={10000}
                 style={{ minHeight: 48 }}
                 autoFocus
               />

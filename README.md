@@ -155,11 +155,18 @@ Uygulama açılınca `/register`'dan bir hesap oluşturman gerekiyor.
 ## Test
 
 ```bash
-# Unit testler (mock'lu)
+# Backend unit testler (mock'lu)
 cd backend && dotnet test tests/TodoApp.UnitTests
 
-# Entegrasyon testleri (gerçek MongoDB — Testcontainers, Docker gerektirir)
+# Backend entegrasyon testleri (gerçek MongoDB — Testcontainers, Docker gerektirir;
+# WebApplicationFactory üzerinden gerçek HTTP istekleriyle uçtan uca API testlerini de içerir)
 cd backend && dotnet test tests/TodoApp.IntegrationTests
+
+# Frontend unit/component testleri (Vitest + Testing Library)
+cd frontend && npm test
+
+# Frontend lint
+cd frontend && npm run lint
 
 # E2E testler (Playwright — backend + frontend'in ayrıca çalışıyor olması gerekir)
 cd frontend && npx playwright install chromium   # ilk çalıştırmada bir kere
@@ -168,9 +175,8 @@ npm run test:e2e
 
 Detaylar için `backend/tests/TodoApp.IntegrationTests/README.md` ve `frontend/e2e/README.md`'ye bak.
 
-GitHub Actions (`.github/workflows/ci.yml`) her push/PR'da backend build+testleri ve frontend
-build'ini çalıştırıyor. `npm ci` için repoda bir `package-lock.json` bulunması gerekiyor —
-yoksa bir kere `npm install` çalıştırıp oluşan dosyayı commit'le.
+GitHub Actions (`.github/workflows/ci.yml`) her push/PR'da backend build+testleri, frontend
+lint+unit test+build'ini çalıştırıyor.
 
 ---
 
@@ -220,13 +226,16 @@ takım adı + story id'sinden türetiliyor.
 
 Bilinçli olarak kapsam dışı bırakılanlar:
 
-- **Production Docker imajı non-root kullanıcı ile çalışmıyor** — `backend/Dockerfile`
-  artık gerçek bir multi-stage build (Render gibi platformlarda kullanılıyor), ama
-  container'ın kendisi hâlâ varsayılan (root) kullanıcıyla çalışıyor. TLS sonlandırma
-  ve MongoDB'nin auth/yedekleme stratejisi de barındırma platformuna (Render, Atlas
-  vb.) bırakılıyor, bu repo'nun kapsamında değil.
-- Modal'larda focus-trap var (`useFocusTrap`) ama kapsamlı, otomatik bir erişilebilirlik
+- TLS sonlandırma ve MongoDB'nin auth/yedekleme stratejisi barındırma platformuna
+  (Render, Atlas vb.) bırakılıyor, bu repo'nun kapsamında değil.
+- Modal'larda focus-trap var (`useFocusTrap`, tüm modallerde), hover-only aksiyonlar
+  `:focus-within` ile klavye erişimine açıldı, ama kapsamlı, otomatik bir erişilebilirlik
   denetimi (axe/Lighthouse) hâlâ yapılmadı — el ile yapılan bir gözden geçirmeydi.
+- Her response'ta `X-Api-Version` header'ı ve `GET /api/version` var, ama URL-segment
+  bazlı versiyonlama (`/api/v1/...`) yok — tek bir sabit route şeması. Gerçek bir
+  breaking change gerektiğinde `/api/v2/...`'yi mevcut (örtük v1) route'ların yanına
+  eklemek üzeredir, geriye dönük bir rewrite değil. Dağıtık
+  izleme/metrik toplama (OpenTelemetry) de eklenmedi.
 
 ---
 
@@ -488,27 +497,66 @@ tamamlandı (US-119 → US-124):
 
 ## Jira / Azure DevOps'tan proje aktarımı
 
-Sprint 11'deki CSV import'u (sabit bir şablon bekliyordu) esnek bir **kolon eşleştirme
-sihirbazına** genişletildi — artık Jira'nın ya da Azure DevOps'un kendi export'unu
-(hangi kolon isimleriyle gelirse gelsin) doğrudan yükleyebiliyorsun:
+İki ayrı yol var: bir CSV export'unu elle yükleyen basit bir wizard, ve Jira/Azure
+DevOps'a doğrudan bağlanıp canlı olarak (yorum/ek/link/sprint/epic dahil) aktarım
+yapan tam entegrasyonlar.
+
+### CSV import (elle export/yükle)
+
+Team → Backlog → "Import CSV" ile, Jira'nın ya da Azure DevOps'un kendi export'unu
+(hangi kolon isimleriyle gelirse gelsin) doğrudan yükleyebilirsin:
 
 1. **Yükle** — CSV'yi seç, backend başlık satırını + verinin tamamını okuyor
 2. **Kolon eşleştir** — Title/Description/Status/Priority/Due Date/Story Points/Labels
-   alanlarının hangi kolona karşılık geldiğini seçiyorsun. Yaygın isimler (Jira'nın
-   "Summary"si, Azure DevOps'un "State"i gibi) **otomatik tahmin ediliyor**, çoğu
-   zaman hiç dokunmadan "Next" diyebilirsin.
+   alanlarının hangi kolona karşılık geldiğini seçiyorsun. Yaygın isimler otomatik tahmin ediliyor.
 3. **Değer eşleştir** (Status ya da Priority bir kolona eşlendiyse) — kaynağın kendi
-   sözlüğünü (Jira'nın "In Progress"i, Azure DevOps'un "Doing"i gibi) bizim
-   durum/öncelik değerlerimize eşliyorsun. Yaygın karşılıklar burada da **otomatik
-   öneriliyor**.
-4. **Önizleme** — hangi satırların içe aktarılacağını, hangilerinin (örn. başlık boşsa)
-   atlanacağını görüyorsun, hiçbir şey henüz oluşturulmuyor.
+   sözlüğünü bizim durum/öncelik değerlerimize eşliyorsun, yaygın karşılıklar otomatik öneriliyor.
+4. **Önizleme** — hangi satırların içe aktarılacağı/atlanacağı görünüyor, hiçbir şey henüz oluşturulmuyor.
 5. **Onayla** — geçerli satırlar story olarak oluşturuluyor.
 
-**Bilinçli olarak yapılmayan:** Atanan kişi (assignee) içe aktarılmıyor — Jira/Azure
-DevOps genelde bir görünen ad/kullanıcı adı export ediyor, e-posta değil, bu yüzden
-bizim hesaplarımızla güvenilir bir şekilde eşleştirilemiyor. İçe aktarılan story'ler
-atanmamış geliyor, elle atama yapman gerekiyor.
+CSV yolunda assignee içe aktarılmıyor (export genelde e-posta değil görünen ad içeriyor,
+güvenilir eşleştirilemiyor) — story'ler atanmamış geliyor.
+
+### Jira entegrasyonu (OAuth 3LO — canlı bağlantı)
+
+Settings → Jira → **Connect Jira** ile Atlassian OAuth akışına yönlendiriliyorsun.
+Bağlandıktan sonra Teams sayfasından "Import from Jira" ile bir projeyi mevcut bir
+takıma aktarabilir ya da doğrudan o projeden yeni bir takım oluşturabilirsin.
+
+Aktarılanlar: issue'lar (başlık/açıklama/durum→board sütunu/öncelik/story points/label),
+yorumlar, ekler, issue link'leri, sprint'ler, epic hiyerarşisi. Assignee, e-postası
+Eunomia'da kayıtlı bir kullanıcıyla eşleşiyorsa otomatik atanıyor; eşleşmiyorsa o
+kişiye davet maili gidiyor. Tekrar import (ya da otomatik senkron, opt-in, 6 saatte
+bir) mevcut story'leri günceller, duplicate oluşturmaz.
+
+**Kurulum** (kendi Atlassian OAuth app'ini kaydetmen gerekiyor): Atlassian Developer
+Console'da bir OAuth 2.0 (3LO) app oluştur, backend'e `Jira__ClientId` /
+`Jira__ClientSecret` / `Jira__RedirectUri` env variable'larını ekle.
+
+**Bilinen kısıt:** Jira'nın Agile API'si (sprint/board-sırası) OAuth 3LO ile
+"scope does not match" hatası veriyor — granular scope eklense bile çözülmüyor
+(Atlassian community'de aynı sorunu yaşayan başkaları da var, kesin bir çözüm yok).
+Sprint import ve Jira'nın kendi board sırasına göre otomatik sütun sıralama bu yüzden
+çalışmıyor; geri kalan her şey (issue/yorum/ek/label/link/epic/assignee) ve elle
+sürükle-bırak sütun sıralama sorunsuz çalışıyor.
+
+### Azure DevOps entegrasyonu (Personal Access Token — canlı bağlantı)
+
+Settings → Azure DevOps → organizasyon adını (`dev.azure.com/{buraya}`) ve bir PAT
+gir, **Connect**'e bas. OAuth değil PAT kullanılıyor çünkü iki OAuth yolu da çıkmaz
+sokak: Microsoft Entra ID uygulamaları kişisel Microsoft hesaplarını (MSA) Azure
+DevOps kaynağı için desteklemiyor, Azure DevOps'un kendi klasik OAuth'unun (app
+registration) kayıt portalı da tamamen kapatılmış durumda. PAT hem kişisel hem
+iş/okul hesapları için çalışıyor ve kurulum tarafında hiçbir env variable gerektirmiyor.
+
+PAT'ı Azure DevOps'ta profil ikonu → **Personal access tokens** → **+ New Token**'dan
+oluştur, **Work Items (Read)** ve **Project and Team (Read)** scope'larını ver.
+
+Aktarılanlar Jira ile aynı kapsamda: work item'lar, yorumlar, ekler, work item
+link'leri, iterasyonlar (sprint), parent hiyerarşisi (epic). Tek fark: Azure
+DevOps'ta herhangi bir parent-child ilişkisi (work item tipine bakılmaksızın) epic
+bağlantısı olarak yorumlanıyor — Jira'nın Epic Link alanı kadar kesin değil ama
+pratikte aynı işi görüyor.
 
 ## Phase 4 — İşbirliği, verimlilik, raporlama, erişilebilirlik
 

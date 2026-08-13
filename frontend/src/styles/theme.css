@@ -1381,6 +1381,14 @@ select option {
   .board-column { width: auto; flex-basis: auto; }
   .story-detail-grid { grid-template-columns: 1fr; }
   .story-detail-sidebar { position: static; }
+  /* .backlog-row packs 7+ fields (checkbox, ticket code, title, status,
+     priority, assignee, due date, actions) into one flex row — too many to
+     reflow sensibly at this width. Scoped to mobile only so desktop's
+     overflow:hidden (for the rounded corners) is untouched; this trades
+     "everything visible without scrolling" for "nothing gets silently
+     clipped with no way to see it". */
+  .backlog-list { overflow-x: auto; }
+  .backlog-row { min-width: 640px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

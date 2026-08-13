@@ -4,6 +4,8 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 using Serilog;
 using TodoApp.Api.BackgroundServices;
 using TodoApp.Api.HealthChecks;
@@ -221,6 +223,28 @@ builder.Services.AddCors(options =>
 builder.Services.AddHealthChecks()
     .AddCheck<MongoHealthCheck>("mongodb");
 
+// Distributed tracing — every incoming HTTP request and every outgoing
+// HttpClient call (Jira/Azure DevOps API calls, Brevo email, R2 attachment
+// storage) gets a span. No MongoDB.Driver instrumentation package exists
+// officially, so Mongo calls themselves aren't traced — everything around
+// them still is. Console exporter only for now (visible in Render's log
+// stream with zero extra infra) — add the OpenTelemetry.Exporter.
+// OpenTelemetryProtocol package and an AddOtlpExporter() call here the day
+// a real collector (Honeycomb, Grafana Cloud, Datadog, etc.) exists to send
+// spans to.
+builder.Services.AddOpenTelemetry()
+    .ConfigureResource(resource => resource.AddService(serviceName: "TodoApp.Api"))
+    .WithTracing(tracing => tracing
+        .AddAspNetCoreInstrumentation(options =>
+        {
+            // Don't trace the health check itself — Render/uptime monitors
+            // poll it every few seconds, and a span per poll is pure noise
+            // with zero diagnostic value.
+            options.Filter = context => context.Request.Path != "/health";
+        })
+        .AddHttpClientInstrumentation()
+        .AddConsoleExporter());
+
 // US-120: periodically checks for stories due soon and reminds the assignee.
 builder.Services.AddHostedService<DueDateReminderBackgroundService>();
 builder.Services.AddHostedService<JiraAutoSyncBackgroundService>();
@@ -250,6 +274,7 @@ app.UseSerilogRequestLogging();
 
 app.UseExceptionHandling();
 app.UseSecurityHeaders();
+app.UseApiVersionHeader();
 
 // Skipped in Development: the Docker Compose setup runs the API over plain
 // HTTP (no self-signed cert wiring inside the container), and redirecting
@@ -272,6 +297,8 @@ app.MapHub<AppHub>("/hubs/app");
 // balancers) that has no way to authenticate. Without this, /health itself
 // returns 401, which most platforms then treat as "service unhealthy."
 app.MapHealthChecks("/health").AllowAnonymous();
+app.MapGet("/api/version", () => Results.Ok(new { version = TodoApp.Api.Middleware.ApiVersionMiddleware.CurrentVersion }))
+    .AllowAnonymous();
 
 app.Run();
 

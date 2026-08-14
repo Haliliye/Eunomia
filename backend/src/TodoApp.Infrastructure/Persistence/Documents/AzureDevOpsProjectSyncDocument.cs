@@ -9,4 +9,5 @@ public class AzureDevOpsProjectSyncDocument
     public bool AutoSyncEnabled { get; set; }
     public DateTime? LastSyncedOn { get; set; }
     public DateTime CreatedOn { get; set; }
+    public List<SyncLogEntryDocument> History { get; set; } = new();
 }

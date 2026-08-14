@@ -16,7 +16,7 @@ namespace TodoApp.UnitTests.UserStories;
 public class GetUserStoriesByTeamQueryHandlerTests
 {
     [Fact]
-    public async Task Handle_RequesterNotATeamMember_ThrowsInvalidOperationException()
+    public async Task Handle_RequesterNotATeamMember_ThrowsUnauthorizedAccessException()
     {
         // Arrange
         var team = Team.Create(Guid.NewGuid().ToString(), "Platform Team", null, "owner-1");
@@ -28,9 +28,9 @@ public class GetUserStoriesByTeamQueryHandlerTests
         var handler = new GetUserStoriesByTeamQueryHandler(storyRepoMock.Object, teamRepoMock.Object);
         var query = new GetUserStoriesByTeamQuery(team.Id, "some-stranger");
 
-        // Act & Assert — Team.EnsureIsMember throws InvalidOperationException
-        // for a non-member (see Team.cs), not UnauthorizedAccessException.
-        await Assert.ThrowsAsync<InvalidOperationException>(() => handler.Handle(query, CancellationToken.None));
+        // Act & Assert — Team.EnsureIsMember throws UnauthorizedAccessException
+        // for a non-member (see Team.cs), not InvalidOperationException.
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => handler.Handle(query, CancellationToken.None));
         storyRepoMock.Verify(r => r.SearchAsync(
             It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<string?>(),
             It.IsAny<int>(), It.IsAny<int>(), It.IsAny<bool>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()),

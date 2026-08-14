@@ -14,6 +14,7 @@ export default function AzureDevOpsSyncPanel({ team }: AzureDevOpsSyncPanelProps
   const [status, setStatus] = useState<AzureDevOpsSyncStatus | null>(null)
   const [isSyncing, setSyncing] = useState(false)
   const [isTogglingSync, setTogglingSync] = useState(false)
+  const [showHistory, setShowHistory] = useState(false)
 
   const isOwnerOrAdmin = team.members.some((m) => m.userId === user?.userId && (m.role === 'Owner' || m.role === 'Admin'))
 
@@ -54,7 +55,29 @@ export default function AzureDevOpsSyncPanel({ team }: AzureDevOpsSyncPanelProps
       <p style={{ fontSize: 12.5, color: 'var(--color-ink-muted)', marginBottom: 8 }}>
         Linked to Azure DevOps project <strong>{status.projectName}</strong>.{' '}
         {status.lastSyncedOn ? `Last synced ${new Date(status.lastSyncedOn).toLocaleString()}.` : 'Never synced yet.'}
+        {status.history && status.history.length > 0 && (
+          <button
+            className="btn btn-ghost btn-sm"
+            style={{ marginLeft: 6, padding: '0 4px', fontSize: 11.5 }}
+            onClick={() => setShowHistory((v) => !v)}
+          >
+            {showHistory ? 'Hide history' : 'Show history'}
+          </button>
+        )}
       </p>
+
+      {showHistory && status.history && status.history.length > 0 && (
+        <ul style={{ fontSize: 12, listStyle: 'none', padding: 0, margin: '0 0 12px', borderLeft: '2px solid var(--color-border)' }}>
+          {status.history.map((entry, i) => (
+            <li key={i} style={{ padding: '4px 0 4px 10px' }}>
+              <span className="mono" style={{ color: 'var(--color-ink-faint)' }}>{new Date(entry.syncedOn).toLocaleString()}</span>
+              {' — '}
+              {entry.createdCount} created, {entry.updatedCount} updated
+              {entry.skippedCount > 0 && `, ${entry.skippedCount} skipped`}
+            </li>
+          ))}
+        </ul>
+      )}
 
       {isOwnerOrAdmin ? (
         <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>

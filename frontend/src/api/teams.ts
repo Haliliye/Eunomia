@@ -5,9 +5,23 @@ import type { Activity } from '@/types/activity'
 
 export type { StoryTemplate }
 
+export interface TeamPortfolioSummary {
+  teamId: string
+  teamName: string
+  memberCount: number
+  totalStoryCount: number
+  doneCount: number
+  overdueCount: number
+  activeSprintName?: string
+  activeSprintEndDate?: string
+}
+
 export const teamsApi = {
   getMyTeams: (page = 1, pageSize = 25) =>
     apiClient.get<PagedResult<Team>>('/teams', { params: { page, pageSize } }).then((res) => res.data),
+
+  getPortfolio: () =>
+    apiClient.get<TeamPortfolioSummary[]>('/teams/portfolio').then((res) => res.data),
 
   getById: (teamId: string) =>
     apiClient.get<Team>(`/teams/${teamId}`).then((res) => res.data),

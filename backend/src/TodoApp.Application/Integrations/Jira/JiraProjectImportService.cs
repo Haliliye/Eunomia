@@ -150,6 +150,7 @@ public class JiraProjectImportService
         await _teamRepository.UpdateAsync(team, cancellationToken);
 
         var applyResult = await UserStoryRowApplier.ApplyAsync(team, rows, _userStoryRepository, _userRepository, requestingUserId, cancellationToken);
+        var skippedCount = rows.Count(r => !r.IsValid);
 
         await AssignSprintsAsync(issues, applyResult.StoryIdByJiraKey, sprintIdByName, cancellationToken);
         await AssignEpicsAsync(team, issues, applyResult.StoryIdByJiraKey, cancellationToken);
@@ -157,11 +158,10 @@ public class JiraProjectImportService
         await ImportCommentsAsync(issues, applyResult.StoryIdByJiraKey, requestingUserId, cancellationToken);
         await ImportAttachmentsAsync(issues, applyResult.StoryIdByJiraKey, accessToken, requestingUserId, cancellationToken);
         await InviteUnregisteredAssigneesAsync(team, issues, requestingUserId, cancellationToken);
-        await UpsertSyncRecordAsync(team.Id, projectKey, requestingUserId, setAutoSync, cancellationToken);
+        await UpsertSyncRecordAsync(team.Id, projectKey, requestingUserId, setAutoSync, applyResult.CreatedCount, applyResult.UpdatedCount, skippedCount, cancellationToken);
 
         await _realtimeNotifier.NotifyTeamAsync(team.Id, new { type = "storyChanged", storyId = (string?)null }, cancellationToken);
 
-        var skippedCount = rows.Count(r => !r.IsValid);
         return new ImportSummaryDto(applyResult.CreatedCount, skippedCount, rows, applyResult.UpdatedCount);
     }
 
@@ -508,7 +508,7 @@ public class JiraProjectImportService
         }
     }
 
-    private async Task UpsertSyncRecordAsync(string teamId, string projectKey, string requestingUserId, bool? setAutoSync, CancellationToken cancellationToken)
+    private async Task UpsertSyncRecordAsync(string teamId, string projectKey, string requestingUserId, bool? setAutoSync, int createdCount, int updatedCount, int skippedCount, CancellationToken cancellationToken)
     {
         try
         {
@@ -517,13 +517,13 @@ public class JiraProjectImportService
             {
                 var sync = JiraProjectSync.Create(Guid.NewGuid().ToString(), teamId, projectKey, requestingUserId);
                 if (setAutoSync == true) sync.SetAutoSync(true, requestingUserId);
-                sync.MarkSynced();
+                sync.RecordSync(createdCount, updatedCount, skippedCount);
                 await _syncRepository.AddAsync(sync, cancellationToken);
             }
             else
             {
                 if (setAutoSync.HasValue) existing.SetAutoSync(setAutoSync.Value, requestingUserId);
-                existing.MarkSynced();
+                existing.RecordSync(createdCount, updatedCount, skippedCount);
                 await _syncRepository.UpdateAsync(existing, cancellationToken);
             }
         }

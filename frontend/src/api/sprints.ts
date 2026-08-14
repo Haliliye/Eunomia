@@ -14,6 +14,22 @@ export interface SprintBurndown {
   actualSnapshots: BurndownPoint[]
 }
 
+export interface CarriedOverStory {
+  id: string
+  title: string
+  status: string
+}
+
+export interface SprintCompletionSummary {
+  sprintId: string
+  sprintName: string
+  completedCount: number
+  completedPoints: number
+  carriedOverCount: number
+  carriedOverPoints: number
+  carriedOverStories: CarriedOverStory[]
+}
+
 export const sprintsApi = {
   getForTeam: (teamId: string) =>
     apiClient.get<Sprint[]>(`/teams/${teamId}/sprints`).then((res) => res.data),
@@ -25,7 +41,7 @@ export const sprintsApi = {
     apiClient.put(`/sprints/${sprintId}/start`),
 
   complete: (sprintId: string) =>
-    apiClient.put(`/sprints/${sprintId}/complete`),
+    apiClient.put<SprintCompletionSummary>(`/sprints/${sprintId}/complete`).then((res) => res.data),
 
   getBurndown: (sprintId: string) =>
     apiClient.get<SprintBurndown>(`/sprints/${sprintId}/burndown`).then((res) => res.data),

@@ -22,6 +22,7 @@ using TodoApp.Application.Teams.Commands.UpdateLabel;
 using TodoApp.Application.Teams.Commands.UpdateTeam;
 using TodoApp.Application.Teams.Queries.GetTeamById;
 using TodoApp.Application.Teams.Queries.GetTeams;
+using TodoApp.Application.Teams.Queries.GetPortfolioOverview;
 
 namespace TodoApp.Api.Controllers;
 
@@ -44,6 +45,14 @@ public class TeamsController : ControllerBase
     {
         var teams = await _mediator.Send(new GetTeamsQuery(User.GetUserId(), page, pageSize), cancellationToken);
         return Ok(teams);
+    }
+
+    /// <summary>A summary row per team the caller belongs to — a "how's everything doing" view for someone managing several teams, without opening each one. A literal route ("portfolio"), so it's matched ahead of the "{id}" route below rather than being treated as a team id.</summary>
+    [HttpGet("portfolio")]
+    public async Task<IActionResult> GetPortfolio(CancellationToken cancellationToken)
+    {
+        var portfolio = await _mediator.Send(new GetPortfolioOverviewQuery(User.GetUserId()), cancellationToken);
+        return Ok(portfolio);
     }
 
     [HttpGet("{id}")]

@@ -45,6 +45,9 @@ export const userStoriesApi = {
   changePriority: (id: string, priority: UserStory['priority']) =>
     apiClient.put(`/userstories/${id}/priority`, { priority }),
 
+  setDueDate: (id: string, dueDate: string | null) =>
+    apiClient.put(`/userstories/${id}/due-date`, { dueDate }),
+
   assign: (id: string, assigneeId: string | null) =>
     apiClient.put(`/userstories/${id}/assignee`, { assigneeId }),
 

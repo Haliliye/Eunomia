@@ -16,7 +16,7 @@ namespace TodoApp.UnitTests.Comments;
 public class GetCommentsByUserStoryQueryHandlerTests
 {
     [Fact]
-    public async Task Handle_RequesterNotATeamMember_ThrowsInvalidOperationException()
+    public async Task Handle_RequesterNotATeamMember_ThrowsUnauthorizedAccessException()
     {
         // Arrange
         var team = Team.Create(Guid.NewGuid().ToString(), "Platform Team", null, "owner-1");
@@ -32,7 +32,7 @@ public class GetCommentsByUserStoryQueryHandlerTests
         var query = new GetCommentsByUserStoryQuery(story.Id, "some-stranger");
 
         // Act & Assert
-        await Assert.ThrowsAsync<InvalidOperationException>(() => handler.Handle(query, CancellationToken.None));
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => handler.Handle(query, CancellationToken.None));
         commentRepoMock.Verify(r => r.GetByUserStoryIdAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 

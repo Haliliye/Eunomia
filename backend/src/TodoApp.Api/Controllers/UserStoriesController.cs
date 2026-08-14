@@ -19,6 +19,7 @@ using TodoApp.Application.UserStories.Commands.RemoveStoryLink;
 using TodoApp.Application.UserStories.Commands.RemoveLabelFromUserStory;
 using TodoApp.Application.UserStories.Commands.ReorderChecklistItems;
 using TodoApp.Application.UserStories.Commands.LogTime;
+using TodoApp.Application.UserStories.Commands.SetDueDate;
 using TodoApp.Application.UserStories.Commands.SetEstimate;
 using TodoApp.Application.UserStories.Commands.SetRecurrence;
 using TodoApp.Application.UserStories.Commands.AnalyzeCsv;
@@ -177,6 +178,14 @@ public class UserStoriesController : ControllerBase
     public async Task<IActionResult> ChangePriority(string id, [FromBody] ChangePriorityRequest request, CancellationToken cancellationToken)
     {
         await _mediator.Send(new ChangeUserStoryPriorityCommand(id, request.Priority, User.GetUserId()), cancellationToken);
+        return NoContent();
+    }
+
+    /// <summary>Narrow due-date-only update — used by the bulk actions bar (unlike the full Update endpoint, this doesn't require the story's current title/description/storyPoints/expectedVersion).</summary>
+    [HttpPut("{id}/due-date")]
+    public async Task<IActionResult> SetDueDate(string id, [FromBody] SetDueDateRequest request, CancellationToken cancellationToken)
+    {
+        await _mediator.Send(new SetUserStoryDueDateCommand(id, request.DueDate, User.GetUserId()), cancellationToken);
         return NoContent();
     }
 
@@ -375,6 +384,7 @@ public record BulkCreateUserStoriesRequest(string TeamId, List<string> Titles);
 public record UpdateUserStoryRequest(string Title, string? Description, DateTime? DueDate, int? StoryPoints, int ExpectedVersion);
 public record ChangeStatusRequest(string Status);
 public record ChangePriorityRequest(string Priority);
+public record SetDueDateRequest(DateTime? DueDate);
 public record AssignUserStoryRequest(string? AssigneeId);
 public record MoveToSprintRequest(string? SprintId);
 public record AddChecklistItemRequest(string Text);

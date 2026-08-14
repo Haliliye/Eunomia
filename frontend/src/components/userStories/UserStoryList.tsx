@@ -32,6 +32,9 @@ interface UserStoryListProps {
   labels: Label[]
   columns: BoardColumn[]
   userNames: Record<string, string>
+  hasActiveFilters?: boolean
+  onCreateNew?: () => void
+  onClearFilters?: () => void
   onEdit: (story: UserStory) => void
   onDelete: (story: UserStory) => void
   onArchive?: (story: UserStory) => void
@@ -51,6 +54,9 @@ export default function UserStoryList({
   labels,
   columns,
   userNames,
+  hasActiveFilters,
+  onCreateNew,
+  onClearFilters,
   onEdit,
   onDelete,
   onArchive,
@@ -61,10 +67,25 @@ export default function UserStoryList({
   onToggleSelect,
 }: UserStoryListProps) {
   if (stories.length === 0) {
+    if (hasActiveFilters) {
+      return (
+        <div className="empty-state">
+          <div className="empty-state-title">No stories match these filters</div>
+          <p>Try adjusting or clearing them to see more of the backlog.</p>
+          {onClearFilters && (
+            <button className="btn" style={{ marginTop: 12 }} onClick={onClearFilters}>Clear filters</button>
+          )}
+        </div>
+      )
+    }
+
     return (
       <div className="empty-state">
-        <div className="empty-state-title">No user stories match</div>
-        <p>Create one, or clear your filters to see the full backlog.</p>
+        <div className="empty-state-title">No stories yet</div>
+        <p>This backlog is empty — create the first story to get started.</p>
+        {onCreateNew && (
+          <button className="btn btn-primary" style={{ marginTop: 12 }} onClick={onCreateNew}>+ Create story</button>
+        )}
       </div>
     )
   }

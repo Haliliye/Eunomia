@@ -1,4 +1,5 @@
 using MediatR;
+using TodoApp.Application.Integrations;
 using TodoApp.Domain.Integrations;
 using TodoApp.Domain.Teams;
 
@@ -24,6 +25,7 @@ public class GetJiraSyncStatusQueryHandler : IRequestHandler<GetJiraSyncStatusQu
         var sync = await _syncRepository.GetByTeamIdAsync(request.TeamId, cancellationToken);
         return sync is null
             ? new JiraSyncStatusDto(false, null, false, null)
-            : new JiraSyncStatusDto(true, sync.ProjectKey, sync.AutoSyncEnabled, sync.LastSyncedOn);
+            : new JiraSyncStatusDto(true, sync.ProjectKey, sync.AutoSyncEnabled, sync.LastSyncedOn,
+                sync.History.Select(h => new SyncLogEntryDto(h.SyncedOn, h.CreatedCount, h.UpdatedCount, h.SkippedCount)).ToList());
     }
 }

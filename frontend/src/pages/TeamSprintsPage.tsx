@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
-import { sprintsApi } from '@/api/sprints'
+import { sprintsApi, type SprintCompletionSummary } from '@/api/sprints'
 import type { Sprint } from '@/types/sprint'
 import { useToast } from '@/context/ToastContext'
 import { useConfirm } from '@/context/ConfirmContext'
+import { useEscapeToClose } from '@/hooks/useEscapeToClose'
+import { useFocusTrap } from '@/hooks/useFocusTrap'
 import type { TeamOutletContext } from './TeamShellPage'
 
 const STATUS_CLASS: Record<Sprint['status'], string> = {
@@ -23,6 +25,9 @@ export default function TeamSprintsPage() {
   const { team } = useOutletContext<TeamOutletContext>()
   const { showToast } = useToast()
   const confirm = useConfirm()
+  const [completionSummary, setCompletionSummary] = useState<SprintCompletionSummary | null>(null)
+  useEscapeToClose(completionSummary !== null, () => setCompletionSummary(null))
+  const completionModalRef = useFocusTrap(completionSummary !== null)
   const [sprints, setSprints] = useState<Sprint[]>([])
   const [isLoading, setLoading] = useState(true)
   const [isCreateOpen, setCreateOpen] = useState(false)
@@ -73,9 +78,9 @@ export default function TeamSprintsPage() {
     if (!confirmed) return
 
     try {
-      await sprintsApi.complete(sprint.id)
+      const summary = await sprintsApi.complete(sprint.id)
       load()
-      showToast(`"${sprint.name}" completed.`)
+      setCompletionSummary(summary)
     } catch (err) {
       showToast(extractErrorMessage(err), 'error')
     }
@@ -135,6 +140,40 @@ export default function TeamSprintsPage() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {completionSummary && (
+        <div className="modal-overlay" onClick={() => setCompletionSummary(null)}>
+          <div ref={completionModalRef} className="modal" role="dialog" aria-modal="true" style={{ maxWidth: 480 }} onClick={(e) => e.stopPropagation()}>
+            <h2>"{completionSummary.sprintName}" completed</h2>
+
+            <div style={{ display: 'flex', gap: 12, margin: '16px 0' }}>
+              <div className="card" style={{ flex: 1, textAlign: 'center', padding: 12 }}>
+                <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--color-done)' }}>{completionSummary.completedCount}</div>
+                <div style={{ fontSize: 12, color: 'var(--color-ink-muted)' }}>completed ({completionSummary.completedPoints} pts)</div>
+              </div>
+              <div className="card" style={{ flex: 1, textAlign: 'center', padding: 12 }}>
+                <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--color-ink-muted)' }}>{completionSummary.carriedOverCount}</div>
+                <div style={{ fontSize: 12, color: 'var(--color-ink-muted)' }}>carried to backlog ({completionSummary.carriedOverPoints} pts)</div>
+              </div>
+            </div>
+
+            {completionSummary.carriedOverStories.length > 0 && (
+              <>
+                <p style={{ fontSize: 12.5, fontWeight: 600, marginBottom: 6 }}>Moved back to the backlog:</p>
+                <ul style={{ fontSize: 13, paddingLeft: 18, margin: 0, maxHeight: 200, overflowY: 'auto' }}>
+                  {completionSummary.carriedOverStories.map((s) => (
+                    <li key={s.id}>{s.title} <span className="mono" style={{ color: 'var(--color-ink-faint)' }}>({s.status})</span></li>
+                  ))}
+                </ul>
+              </>
+            )}
+
+            <div className="modal-actions" style={{ marginTop: 16 }}>
+              <button className="btn btn-primary" onClick={() => setCompletionSummary(null)}>Done</button>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -95,6 +95,9 @@ export default function Layout() {
           <Link to="/teams" className={`sidebar-link ${isTeamsActive ? 'active' : ''}`}>
             <span className="sidebar-link-icon" aria-hidden="true">⊞</span> All Teams
           </Link>
+          <Link to="/portfolio" className={`sidebar-link ${location.pathname === '/portfolio' ? 'active' : ''}`}>
+            <span className="sidebar-link-icon" aria-hidden="true">📊</span> Portfolio
+          </Link>
         </nav>
 
         {recentTeams.length > 0 && (

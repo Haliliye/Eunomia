@@ -12,6 +12,10 @@ import BulkCreateModal from '@/components/userStories/BulkCreateModal'
 import EditUserStoryModal from '@/components/userStories/EditUserStoryModal'
 import { useToast } from '@/context/ToastContext'
 import { useConfirm } from '@/context/ConfirmContext'
+import { useAuth } from '@/context/AuthContext'
+import { getSavedFilters, saveFilter, deleteSavedFilter, type SavedFilter } from '@/lib/savedFilters'
+import { useEscapeToClose } from '@/hooks/useEscapeToClose'
+import { useFocusTrap } from '@/hooks/useFocusTrap'
 import { useUserNames } from '@/hooks/useUserNames'
 import { useKeyboardShortcut } from '@/hooks/useKeyboardShortcut'
 import { ensureRealtimeConnectionStarted, getRealtimeConnection } from '@/services/realtimeConnection'
@@ -35,12 +39,18 @@ const PAGE_SIZE = 25
 
 export default function TeamBacklogPage() {
   const { team } = useOutletContext<TeamOutletContext>()
+  const { user } = useAuth()
   const { showToast } = useToast()
   const confirm = useConfirm()
   const [stories, setStories] = useState<UserStory[]>([])
   const [totalCount, setTotalCount] = useState(0)
   const [page, setPage] = useState(1)
   const [filters, setFilters] = useState<UserStoryFilters>(() => loadFilters(team.id))
+  const [savedFilters, setSavedFilters] = useState<SavedFilter[]>(() => user ? getSavedFilters(user.userId, team.id) : [])
+  const [isSaveFilterOpen, setSaveFilterOpen] = useState(false)
+  const [saveFilterName, setSaveFilterName] = useState('')
+  useEscapeToClose(isSaveFilterOpen, () => setSaveFilterOpen(false))
+  const saveFilterModalRef = useFocusTrap(isSaveFilterOpen)
   const [isLoading, setLoading] = useState(true)
   const [isCreateOpen, setCreateOpen] = useState(false)
   const [isImportOpen, setImportOpen] = useState(false)
@@ -82,6 +92,32 @@ export default function TeamBacklogPage() {
   const handleFiltersChange = (next: UserStoryFilters) => {
     setFilters(next)
     sessionStorage.setItem(filterStorageKey(team.id), JSON.stringify(next))
+  }
+
+  const handleApplySavedFilter = (saved: SavedFilter) => {
+    handleFiltersChange(saved.filters)
+    setSprintFilter(saved.sprintId ?? '')
+    setLabelFilter(saved.labelId ?? '')
+  }
+
+  const handleSaveCurrentFilters = () => {
+    if (!user || !saveFilterName.trim()) return
+    const next = saveFilter(user.userId, team.id, saveFilterName.trim(), filters, sprintFilter || undefined, labelFilter || undefined)
+    setSavedFilters(next)
+    setSaveFilterName('')
+    setSaveFilterOpen(false)
+    showToast(`Saved view "${saveFilterName.trim()}".`)
+  }
+
+  const handleDeleteSavedFilter = (id: string, name: string) => {
+    if (!user) return
+    setSavedFilters(deleteSavedFilter(user.userId, team.id, id))
+    showToast(`Removed saved view "${name}".`)
+  }
+
+  const handleMyStories = () => {
+    if (!user) return
+    handleFiltersChange({ ...filters, assigneeId: filters.assigneeId === user.userId ? undefined : user.userId })
   }
 
   const refetchStories = () => loadStories(page)
@@ -187,7 +223,18 @@ export default function TeamBacklogPage() {
       await userStoriesApi.archive(story.id)
       await refetchStories()
       setError(null)
-      showToast(`"${story.title}" was archived.`)
+      showToast(`"${story.title}" was archived.`, 'success', {
+        label: 'Undo',
+        onClick: async () => {
+          try {
+            await userStoriesApi.unarchive(story.id)
+            await refetchStories()
+            showToast(`"${story.title}" restored.`)
+          } catch {
+            showToast("Couldn't undo that.", 'error')
+          }
+        },
+      })
     } catch (err) {
       setError(extractErrorMessage(err))
     }
@@ -252,7 +299,19 @@ export default function TeamBacklogPage() {
     if (failedCount > 0) {
       setError(`${failedCount} of ${ids.length} stories couldn't be archived.`)
     } else {
-      showToast(`${ids.length} stories archived.`)
+      const successfulIds = ids
+      showToast(`${ids.length} stories archived.`, 'success', {
+        label: 'Undo',
+        onClick: async () => {
+          try {
+            await Promise.allSettled(successfulIds.map((id) => userStoriesApi.unarchive(id)))
+            await refetchStories()
+            showToast(`${successfulIds.length} stories restored.`)
+          } catch {
+            showToast("Couldn't undo that.", 'error')
+          }
+        },
+      })
     }
   }
 
@@ -300,6 +359,23 @@ export default function TeamBacklogPage() {
       setError(`${failedCount} of ${ids.length} stories couldn't be reassigned.`)
     } else {
       showToast(`${ids.length} stories reassigned.`)
+    }
+  }
+
+  const handleBulkSetDueDate = async (dueDate: string) => {
+    const ids = Array.from(selectedIds)
+    if (ids.length === 0) return
+
+    const results = await Promise.allSettled(ids.map((id) => userStoriesApi.setDueDate(id, dueDate || null)))
+    const failedCount = results.filter((r) => r.status === 'rejected').length
+
+    setSelectedIds(new Set())
+    await refetchStories()
+
+    if (failedCount > 0) {
+      setError(`${failedCount} of ${ids.length} stories couldn't be updated.`)
+    } else {
+      showToast(dueDate ? `Due date set on ${ids.length} stories.` : `Due date cleared on ${ids.length} stories.`)
     }
   }
 
@@ -356,6 +432,30 @@ export default function TeamBacklogPage() {
           <span className="backlog-count">({totalCount} work item{totalCount === 1 ? '' : 's'})</span>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <button
+            className={`btn btn-sm ${filters.assigneeId === user?.userId ? 'btn-primary' : ''}`}
+            onClick={handleMyStories}
+          >
+            My stories
+          </button>
+          {savedFilters.map((f) => (
+            <span key={f.id} className="label-chip" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'var(--color-surface-sunken)', border: '1px solid var(--color-border)' }}>
+              <button
+                style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', color: 'inherit', cursor: 'pointer' }}
+                onClick={() => handleApplySavedFilter(f)}
+              >
+                ★ {f.name}
+              </button>
+              <button
+                style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', color: 'inherit', opacity: 0.6, cursor: 'pointer' }}
+                title="Remove this saved view"
+                onClick={() => handleDeleteSavedFilter(f.id, f.name)}
+              >
+                ✕
+              </button>
+            </span>
+          ))}
+          <button className="btn btn-sm" onClick={() => setSaveFilterOpen(true)}>☆ Save current filters</button>
           <select className="pill-select" value={sprintFilter} onChange={(e) => setSprintFilter(e.target.value)}>
             <option value="">All stories</option>
             <option value="none">Backlog only (no sprint)</option>
@@ -450,6 +550,16 @@ export default function TeamBacklogPage() {
               <option key={m.userId} value={m.userId}>{userNames[m.userId] ?? m.userId}</option>
             ))}
           </select>
+          <input
+            type="date"
+            className="pill-select"
+            style={{ width: 150 }}
+            title="Set due date on selected stories"
+            onChange={(e) => {
+              if (e.target.value) handleBulkSetDueDate(e.target.value)
+              e.target.value = ''
+            }}
+          />
           {team.labels.length > 0 && (
             <select
               className="pill-select"
@@ -480,6 +590,9 @@ export default function TeamBacklogPage() {
             labels={team.labels}
             columns={team.columns}
             userNames={userNames}
+            hasActiveFilters={Boolean(filters.status || filters.priority || filters.assigneeId || filters.keyword || sprintFilter || labelFilter)}
+            onCreateNew={() => setCreateOpen(true)}
+            onClearFilters={() => { setFilters({}); setSprintFilter(''); setLabelFilter('') }}
             onEdit={setEditingStory}
             onDelete={handleDeleteStory}
             onArchive={handleArchive}
@@ -534,6 +647,30 @@ export default function TeamBacklogPage() {
         onSave={handleSaveEdit}
         onLabelsChanged={handleLabelsChanged}
       />
+      {isSaveFilterOpen && (
+        <div className="modal-overlay" onClick={() => setSaveFilterOpen(false)}>
+          <div ref={saveFilterModalRef} className="modal" role="dialog" aria-modal="true" style={{ maxWidth: 380 }} onClick={(e) => e.stopPropagation()}>
+            <h2>Save current filters</h2>
+            <div className="field">
+              <label htmlFor="save-filter-name">Name</label>
+              <input
+                id="save-filter-name"
+                className="input"
+                value={saveFilterName}
+                onChange={(e) => setSaveFilterName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleSaveCurrentFilters() }}
+                placeholder="e.g. Overdue & mine"
+                maxLength={50}
+                autoFocus
+              />
+            </div>
+            <div className="modal-actions" style={{ marginTop: 16 }}>
+              <button className="btn" onClick={() => setSaveFilterOpen(false)}>Cancel</button>
+              <button className="btn btn-primary" disabled={!saveFilterName.trim()} onClick={handleSaveCurrentFilters}>Save</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

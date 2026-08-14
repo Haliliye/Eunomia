@@ -13,6 +13,8 @@ namespace TodoApp.Domain.Integrations;
 /// </summary>
 public class JiraProjectSync : AggregateRoot
 {
+    private const int MaxHistoryEntries = 10;
+
     public string TeamId { get; private set; } = string.Empty;
     public string ProjectKey { get; private set; } = string.Empty;
 
@@ -22,6 +24,10 @@ public class JiraProjectSync : AggregateRoot
     public bool AutoSyncEnabled { get; private set; }
     public DateTime? LastSyncedOn { get; private set; }
     public DateTime CreatedOn { get; private set; }
+
+    private readonly List<SyncLogEntry> _history = new();
+    /// <summary>Most recent first — capped at MaxHistoryEntries, since this is a "what happened lately" panel, not a full audit log.</summary>
+    public IReadOnlyList<SyncLogEntry> History => _history.AsReadOnly();
 
     private JiraProjectSync() { }
 
@@ -36,7 +42,7 @@ public class JiraProjectSync : AggregateRoot
     public static JiraProjectSync Create(string id, string teamId, string projectKey, string connectedByUserId) =>
         new(id, teamId, projectKey, connectedByUserId);
 
-    public static JiraProjectSync Rehydrate(string id, string teamId, string projectKey, string connectedByUserId, bool autoSyncEnabled, DateTime? lastSyncedOn, DateTime createdOn)
+    public static JiraProjectSync Rehydrate(string id, string teamId, string projectKey, string connectedByUserId, bool autoSyncEnabled, DateTime? lastSyncedOn, DateTime createdOn, IEnumerable<SyncLogEntry>? history = null)
     {
         var sync = new JiraProjectSync(id, teamId, projectKey, connectedByUserId)
         {
@@ -44,6 +50,7 @@ public class JiraProjectSync : AggregateRoot
             LastSyncedOn = lastSyncedOn,
             CreatedOn = createdOn
         };
+        if (history is not null) sync._history.AddRange(history);
         return sync;
     }
 
@@ -53,5 +60,12 @@ public class JiraProjectSync : AggregateRoot
         ConnectedByUserId = connectedByUserId; // re-confirm whose token to use, in case ownership changed
     }
 
-    public void MarkSynced() => LastSyncedOn = DateTime.UtcNow;
+    /// <summary>Replaces the old no-argument MarkSynced() — records what an import/sync actually did, not just that one happened, so the sync panel can show "12 created, 4 updated" instead of just a timestamp.</summary>
+    public void RecordSync(int createdCount, int updatedCount, int skippedCount)
+    {
+        LastSyncedOn = DateTime.UtcNow;
+        _history.Insert(0, new SyncLogEntry(LastSyncedOn.Value, createdCount, updatedCount, skippedCount));
+        if (_history.Count > MaxHistoryEntries)
+            _history.RemoveRange(MaxHistoryEntries, _history.Count - MaxHistoryEntries);
+    }
 }

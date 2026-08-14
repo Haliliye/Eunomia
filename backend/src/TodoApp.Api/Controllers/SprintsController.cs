@@ -45,8 +45,8 @@ public class SprintsController : ControllerBase
     [HttpPut("sprints/{id}/complete")]
     public async Task<IActionResult> Complete(string id, CancellationToken cancellationToken)
     {
-        await _mediator.Send(new CompleteSprintCommand(id, User.GetUserId()), cancellationToken);
-        return NoContent();
+        var summary = await _mediator.Send(new CompleteSprintCommand(id, User.GetUserId()), cancellationToken);
+        return Ok(summary);
     }
 
     /// <summary>Classic Kanban/Scrum burndown — remaining count/points per day

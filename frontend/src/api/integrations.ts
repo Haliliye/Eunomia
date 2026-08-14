@@ -19,11 +19,19 @@ export interface CreateTeamFromJiraResult {
   importSummary: ImportSummary
 }
 
+export interface SyncLogEntry {
+  syncedOn: string
+  createdCount: number
+  updatedCount: number
+  skippedCount: number
+}
+
 export interface JiraSyncStatus {
   isLinked: boolean
   projectKey?: string
   autoSyncEnabled: boolean
   lastSyncedOn?: string
+  history?: SyncLogEntry[]
 }
 
 export const integrationsApi = {

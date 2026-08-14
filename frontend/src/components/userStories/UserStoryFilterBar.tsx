@@ -32,6 +32,15 @@ export default function UserStoryFilterBar({ members, columns, userNames, filter
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [keywordInput])
 
+  useEffect(() => {
+    // Keeps the visible search box in sync when filters are cleared from
+    // outside this component (e.g. the "Clear filters" button on the empty
+    // state) — without this, the box would still show old typed text even
+    // though the underlying filter had already been reset.
+    if (!filters.keyword && keywordInput) setKeywordInput('')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters.keyword])
+
   const hasActiveFilters = Boolean(filters.status || filters.priority || filters.assigneeId || filters.keyword)
 
   const handleClear = () => {

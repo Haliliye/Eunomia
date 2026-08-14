@@ -18,11 +18,19 @@ export interface CreateTeamFromAzureDevOpsResult {
   importSummary: ImportSummary
 }
 
+export interface AzureDevOpsSyncLogEntry {
+  syncedOn: string
+  createdCount: number
+  updatedCount: number
+  skippedCount: number
+}
+
 export interface AzureDevOpsSyncStatus {
   isLinked: boolean
   projectName?: string
   autoSyncEnabled: boolean
   lastSyncedOn?: string
+  history?: AzureDevOpsSyncLogEntry[]
 }
 
 export const azureDevOpsApi = {

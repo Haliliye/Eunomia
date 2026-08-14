@@ -249,23 +249,34 @@ builder.Services.AddHealthChecks()
 // HttpClient call (Jira/Azure DevOps API calls, Brevo email, R2 attachment
 // storage) gets a span. No MongoDB.Driver instrumentation package exists
 // officially, so Mongo calls themselves aren't traced — everything around
-// them still is. Console exporter only for now (visible in Render's log
-// stream with zero extra infra) — add the OpenTelemetry.Exporter.
-// OpenTelemetryProtocol package and an AddOtlpExporter() call here the day
-// a real collector (Honeycomb, Grafana Cloud, Datadog, etc.) exists to send
-// spans to.
+// them still is. Sends to a real OTLP collector (Honeycomb, Grafana Cloud,
+// Datadog, etc.) when Otel:OtlpEndpoint is configured; otherwise falls back
+// to the Console exporter (visible in Render's log stream with zero extra
+// infra) so tracing still works out of the box before a collector exists.
+var otlpEndpoint = builder.Configuration["Otel:OtlpEndpoint"];
 builder.Services.AddOpenTelemetry()
     .ConfigureResource(resource => resource.AddService(serviceName: "TodoApp.Api"))
-    .WithTracing(tracing => tracing
-        .AddAspNetCoreInstrumentation(options =>
+    .WithTracing(tracing =>
+    {
+        tracing
+            .AddAspNetCoreInstrumentation(options =>
+            {
+                // Don't trace the health check itself — Render/uptime monitors
+                // poll it every few seconds, and a span per poll is pure noise
+                // with zero diagnostic value.
+                options.Filter = context => context.Request.Path != "/health";
+            })
+            .AddHttpClientInstrumentation();
+
+        if (string.IsNullOrWhiteSpace(otlpEndpoint))
         {
-            // Don't trace the health check itself — Render/uptime monitors
-            // poll it every few seconds, and a span per poll is pure noise
-            // with zero diagnostic value.
-            options.Filter = context => context.Request.Path != "/health";
-        })
-        .AddHttpClientInstrumentation()
-        .AddConsoleExporter());
+            tracing.AddConsoleExporter();
+        }
+        else
+        {
+            tracing.AddOtlpExporter(otlp => otlp.Endpoint = new Uri(otlpEndpoint));
+        }
+    });
 
 // US-120: periodically checks for stories due soon and reminds the assignee.
 builder.Services.AddHostedService<DueDateReminderBackgroundService>();

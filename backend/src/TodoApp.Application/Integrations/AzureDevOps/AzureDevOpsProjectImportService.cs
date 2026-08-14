@@ -105,6 +105,7 @@ public class AzureDevOpsProjectImportService
 
         var applyResult = await UserStoryRowApplier.ApplyAsync(team, rows, _userStoryRepository, _userRepository, requestingUserId, cancellationToken);
         var storyIdByWorkItemId = applyResult.StoryIdByAzureDevOpsWorkItemId;
+        var skippedCount = rows.Count(r => !r.IsValid);
 
         await AssignIterationsAsync(workItems, storyIdByWorkItemId, iterationIdByPath, cancellationToken);
         await AssignParentsAsync(team, workItems, storyIdByWorkItemId, cancellationToken);
@@ -112,11 +113,10 @@ public class AzureDevOpsProjectImportService
         await ImportCommentsAsync(workItems, storyIdByWorkItemId, organization, projectName, personalAccessToken, requestingUserId, cancellationToken);
         await ImportAttachmentsAsync(workItems, storyIdByWorkItemId, personalAccessToken, requestingUserId, cancellationToken);
         await InviteUnregisteredAssigneesAsync(team, workItems, requestingUserId, cancellationToken);
-        await UpsertSyncRecordAsync(team.Id, organization, projectName, requestingUserId, setAutoSync, cancellationToken);
+        await UpsertSyncRecordAsync(team.Id, organization, projectName, requestingUserId, setAutoSync, applyResult.CreatedCount, applyResult.UpdatedCount, skippedCount, cancellationToken);
 
         await _realtimeNotifier.NotifyTeamAsync(team.Id, new { type = "storyChanged", storyId = (string?)null }, cancellationToken);
 
-        var skippedCount = rows.Count(r => !r.IsValid);
         return new ImportSummaryDto(applyResult.CreatedCount, skippedCount, rows, applyResult.UpdatedCount);
     }
 
@@ -425,7 +425,7 @@ public class AzureDevOpsProjectImportService
         }
     }
 
-    private async Task UpsertSyncRecordAsync(string teamId, string organization, string projectName, string requestingUserId, bool? setAutoSync, CancellationToken cancellationToken)
+    private async Task UpsertSyncRecordAsync(string teamId, string organization, string projectName, string requestingUserId, bool? setAutoSync, int createdCount, int updatedCount, int skippedCount, CancellationToken cancellationToken)
     {
         try
         {
@@ -434,13 +434,13 @@ public class AzureDevOpsProjectImportService
             {
                 var sync = AzureDevOpsProjectSync.Create(Guid.NewGuid().ToString(), teamId, projectName, requestingUserId);
                 if (setAutoSync == true) sync.SetAutoSync(true, requestingUserId);
-                sync.MarkSynced();
+                sync.RecordSync(createdCount, updatedCount, skippedCount);
                 await _syncRepository.AddAsync(sync, cancellationToken);
             }
             else
             {
                 if (setAutoSync.HasValue) existing.SetAutoSync(setAutoSync.Value, requestingUserId);
-                existing.MarkSynced();
+                existing.RecordSync(createdCount, updatedCount, skippedCount);
                 await _syncRepository.UpdateAsync(existing, cancellationToken);
             }
         }

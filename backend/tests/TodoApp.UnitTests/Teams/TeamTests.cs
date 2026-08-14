@@ -23,13 +23,13 @@ public class TeamTests
     }
 
     [Fact]
-    public void AddMember_ByNonOwner_ThrowsInvalidOperationException()
+    public void AddMember_ByNonOwner_ThrowsUnauthorizedAccessException()
     {
         var team = Team.Create(Guid.NewGuid().ToString(), "Platform Team", null, "owner-1");
         team.AddMember("member-1", "owner-1");
 
         // member-1 is an ordinary member, not the owner — can't add others.
-        Assert.Throws<InvalidOperationException>(() => team.AddMember("member-2", "member-1"));
+        Assert.Throws<UnauthorizedAccessException>(() => team.AddMember("member-2", "member-1"));
     }
 
     [Fact]
@@ -53,13 +53,13 @@ public class TeamTests
     }
 
     [Fact]
-    public void RemoveMember_ByNonOwner_ThrowsInvalidOperationException()
+    public void RemoveMember_ByNonOwner_ThrowsUnauthorizedAccessException()
     {
         var team = Team.Create(Guid.NewGuid().ToString(), "Platform Team", null, "owner-1");
         team.AddMember("member-1", "owner-1");
         team.AddMember("member-2", "owner-1");
 
-        Assert.Throws<InvalidOperationException>(() => team.RemoveMember("member-2", "member-1"));
+        Assert.Throws<UnauthorizedAccessException>(() => team.RemoveMember("member-2", "member-1"));
     }
 
     [Fact]
@@ -96,30 +96,30 @@ public class TeamTests
     }
 
     [Fact]
-    public void SetMemberRole_ByNonOwner_ThrowsInvalidOperationException()
+    public void SetMemberRole_ByNonOwner_ThrowsUnauthorizedAccessException()
     {
         var team = Team.Create(Guid.NewGuid().ToString(), "Platform Team", null, "owner-1");
         team.AddMember("member-1", "owner-1");
         team.AddMember("member-2", "owner-1");
 
-        Assert.Throws<InvalidOperationException>(() => team.SetMemberRole("member-2", TeamRole.Admin, "member-1"));
+        Assert.Throws<UnauthorizedAccessException>(() => team.SetMemberRole("member-2", TeamRole.Admin, "member-1"));
     }
 
     [Fact]
-    public void EnsureIsMember_NonMember_ThrowsInvalidOperationException()
+    public void EnsureIsMember_NonMember_ThrowsUnauthorizedAccessException()
     {
         var team = Team.Create(Guid.NewGuid().ToString(), "Platform Team", null, "owner-1");
 
-        Assert.Throws<InvalidOperationException>(() => team.EnsureIsMember("some-stranger"));
+        Assert.Throws<UnauthorizedAccessException>(() => team.EnsureIsMember("some-stranger"));
     }
 
     [Fact]
-    public void EnsureIsOwnerOrAdmin_OrdinaryMember_ThrowsInvalidOperationException()
+    public void EnsureIsOwnerOrAdmin_OrdinaryMember_ThrowsUnauthorizedAccessException()
     {
         var team = Team.Create(Guid.NewGuid().ToString(), "Platform Team", null, "owner-1");
         team.AddMember("member-1", "owner-1");
 
-        Assert.Throws<InvalidOperationException>(() => team.EnsureIsOwnerOrAdmin("member-1"));
+        Assert.Throws<UnauthorizedAccessException>(() => team.EnsureIsOwnerOrAdmin("member-1"));
     }
 
     [Fact]

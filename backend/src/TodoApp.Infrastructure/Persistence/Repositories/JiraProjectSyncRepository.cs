@@ -40,9 +40,17 @@ public class JiraProjectSyncRepository : IJiraProjectSyncRepository
         AutoSyncEnabled = sync.AutoSyncEnabled,
         LastSyncedOn = sync.LastSyncedOn,
         CreatedOn = sync.CreatedOn,
+        History = sync.History.Select(h => new SyncLogEntryDocument
+        {
+            SyncedOn = h.SyncedOn,
+            CreatedCount = h.CreatedCount,
+            UpdatedCount = h.UpdatedCount,
+            SkippedCount = h.SkippedCount,
+        }).ToList(),
     };
 
     private static JiraProjectSync ToDomain(JiraProjectSyncDocument document) => JiraProjectSync.Rehydrate(
         document.Id, document.TeamId, document.ProjectKey, document.ConnectedByUserId,
-        document.AutoSyncEnabled, document.LastSyncedOn, document.CreatedOn);
+        document.AutoSyncEnabled, document.LastSyncedOn, document.CreatedOn,
+        document.History.Select(h => new SyncLogEntry(h.SyncedOn, h.CreatedCount, h.UpdatedCount, h.SkippedCount)));
 }

@@ -17,6 +17,7 @@ import ResetPasswordPage from './pages/ResetPasswordPage'
 import VerifyEmailPage from './pages/VerifyEmailPage'
 
 const TeamsPage = lazy(() => import('./pages/TeamsPage'))
+const PortfolioPage = lazy(() => import('./pages/PortfolioPage'))
 const TeamShellPage = lazy(() => import('./pages/TeamShellPage'))
 const TeamSummaryPage = lazy(() => import('./pages/TeamSummaryPage'))
 const TeamBacklogPage = lazy(() => import('./pages/TeamBacklogPage'))
@@ -55,6 +56,7 @@ export default function App() {
           <Route element={<Layout />}>
             <Route path="/" element={<Navigate to="/teams" replace />} />
             <Route path="/teams" element={<TeamsPage />} />
+            <Route path="/portfolio" element={<PortfolioPage />} />
 
             <Route path="/teams/:teamId" element={<TeamShellPage />}>
               <Route index element={<Navigate to="summary" replace />} />

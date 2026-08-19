@@ -19,6 +19,8 @@ public static class DependencyInjection
         services.AddScoped<Integrations.Jira.JiraAccessTokenProvider>();
         services.AddScoped<Integrations.Jira.JiraProjectImportService>();
         services.AddScoped<Integrations.AzureDevOps.AzureDevOpsProjectImportService>();
+        services.AddScoped<Integrations.GitHub.GitHubAccessTokenProvider>();
+        services.AddScoped<Integrations.GitHub.GitHubProjectImportService>();
 
         return services;
     }

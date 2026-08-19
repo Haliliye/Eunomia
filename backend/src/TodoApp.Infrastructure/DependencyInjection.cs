@@ -16,6 +16,7 @@ using TodoApp.Infrastructure.Attachments;
 using TodoApp.Infrastructure.Email;
 using TodoApp.Infrastructure.Integrations.Jira;
 using TodoApp.Infrastructure.Integrations.AzureDevOps;
+using TodoApp.Infrastructure.Integrations.GitHub;
 using TodoApp.Infrastructure.Persistence;
 using TodoApp.Infrastructure.Persistence.Repositories;
 using TodoApp.Infrastructure.Security;
@@ -33,6 +34,7 @@ public static class DependencyInjection
         services.Configure<AttachmentStorageSettings>(configuration.GetSection(AttachmentStorageSettings.SectionName));
         services.Configure<R2StorageSettings>(configuration.GetSection(R2StorageSettings.SectionName));
         services.Configure<JiraSettings>(configuration.GetSection(JiraSettings.SectionName));
+        services.Configure<GitHubSettings>(configuration.GetSection(GitHubSettings.SectionName));
         services.Configure<TokenEncryptionSettings>(configuration.GetSection(TokenEncryptionSettings.SectionName));
         services.AddSingleton<MongoDbContext>();
 
@@ -49,6 +51,7 @@ public static class DependencyInjection
         services.AddScoped<ISprintRepository, SprintRepository>();
         services.AddScoped<IPersonalTaskRepository, PersonalTaskRepository>();
         services.AddScoped<IJiraConnectionRepository, JiraConnectionRepository>();
+        services.AddScoped<IGitHubConnectionRepository, GitHubConnectionRepository>();
         services.AddScoped<IAzureDevOpsConnectionRepository, AzureDevOpsConnectionRepository>();
         services.AddScoped<IAzureDevOpsProjectSyncRepository, AzureDevOpsProjectSyncRepository>();
         services.AddScoped<IEmailSignupInvitationRepository, EmailSignupInvitationRepository>();
@@ -105,6 +108,13 @@ public static class DependencyInjection
         if (jiraSettings?.IsConfigured == true)
         {
             services.AddHttpClient<IJiraClient, JiraApiClient>();
+        }
+
+        // Same gating reasoning as Jira above — only usable once GitHub:ClientId/ClientSecret are set.
+        var gitHubSettings = configuration.GetSection(GitHubSettings.SectionName).Get<GitHubSettings>();
+        if (gitHubSettings?.IsConfigured == true)
+        {
+            services.AddHttpClient<IGitHubClient, GitHubApiClient>();
         }
 
         // PAT-based (see AzureDevOpsConnection) — no client id/secret to gate

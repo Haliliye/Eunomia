@@ -5,20 +5,25 @@ using TodoApp.Domain.Users;
 
 namespace TodoApp.Application.UserStories.Commands.ImportUserStories;
 
-/// <summary>Story ids keyed by the Jira issue key (or, separately, the Azure DevOps work item id) that produced them — lets the Jira/Azure DevOps import services resolve issue links/comments/attachments against the right story right after this batch, without a second DB round trip per row.</summary>
-internal record ApplyResult(int CreatedCount, int UpdatedCount, IReadOnlyDictionary<string, string> StoryIdByJiraKey, IReadOnlyDictionary<string, string> StoryIdByAzureDevOpsWorkItemId);
+/// <summary>Story ids keyed by each source's own issue identifier — lets each import service resolve issue links/comments/attachments against the right story right after this batch, without a second DB round trip per row.</summary>
+internal record ApplyResult(
+    int CreatedCount,
+    int UpdatedCount,
+    IReadOnlyDictionary<string, string> StoryIdByJiraKey,
+    IReadOnlyDictionary<string, string> StoryIdByAzureDevOpsWorkItemId,
+    IReadOnlyDictionary<string, string> StoryIdByGitHubIssueKey);
 
 /// <summary>
 /// Turns already-parsed+validated ImportRowDtos into real UserStory
 /// aggregates on a team. Shared by ImportUserStoriesCommandHandler (CSV),
-/// JiraProjectImportService (Jira OAuth), and AzureDevOpsProjectImportService
-/// (Azure DevOps OAuth) — the three sources differ only in how they produce
+/// JiraProjectImportService, AzureDevOpsProjectImportService, and
+/// GitHubProjectImportService — the sources differ only in how they produce
 /// ImportRowDtos, not in what happens once you have them.
 ///
-/// Rows carrying a JiraIssueKey or AzureDevOpsWorkItemId are matched against
-/// existing stories with that same key/id on this team and updated in place
-/// instead of creating a duplicate — this is what makes re-importing the
-/// same Jira project (or Azure DevOps project) safe to run repeatedly.
+/// Rows carrying a JiraIssueKey, AzureDevOpsWorkItemId, or GitHubIssueKey are
+/// matched against existing stories with that same key/id on this team and
+/// updated in place instead of creating a duplicate — this is what makes
+/// re-importing the same project safe to run repeatedly.
 /// </summary>
 internal static class UserStoryRowApplier
 {
@@ -42,10 +47,16 @@ internal static class UserStoryRowApplier
             .Where(s => s.AzureDevOpsWorkItemId is not null)
             .ToDictionary(s => s.AzureDevOpsWorkItemId!, s => s);
 
+        var gitHubKeys = rows.Where(r => r.IsValid && r.GitHubIssueKey is not null).Select(r => r.GitHubIssueKey!).Distinct().ToList();
+        var existingByGitHubKey = (await userStoryRepository.GetByGitHubIssueKeysAsync(team.Id, gitHubKeys, cancellationToken))
+            .Where(s => s.GitHubIssueKey is not null)
+            .ToDictionary(s => s.GitHubIssueKey!, s => s);
+
         var createdCount = 0;
         var updatedCount = 0;
         var storyIdByJiraKey = new Dictionary<string, string>();
         var storyIdByWorkItemId = new Dictionary<string, string>();
+        var storyIdByGitHubKey = new Dictionary<string, string>();
 
         foreach (var row in rows)
         {
@@ -53,6 +64,7 @@ internal static class UserStoryRowApplier
 
             var existing = (row.JiraIssueKey is not null && existingByJiraKey.TryGetValue(row.JiraIssueKey, out var byJira)) ? byJira
                 : (row.AzureDevOpsWorkItemId is not null && existingByWorkItemId.TryGetValue(row.AzureDevOpsWorkItemId, out var byWorkItem)) ? byWorkItem
+                : (row.GitHubIssueKey is not null && existingByGitHubKey.TryGetValue(row.GitHubIssueKey, out var byGitHub)) ? byGitHub
                 : null;
 
             UserStory story;
@@ -63,12 +75,13 @@ internal static class UserStoryRowApplier
             }
             else
             {
-                // The importer is recorded as reporter — the CSV/Jira/Azure
-                // DevOps source doesn't reliably map to one of our accounts
-                // (same reasoning as AssigneeEmail's fallback), and "who ran
-                // the import" is a more useful fact than "unknown" anyway.
+                // The importer is recorded as reporter — the source doesn't
+                // reliably map to one of our accounts (same reasoning as
+                // AssigneeEmail's fallback), and "who ran the import" is a
+                // more useful fact than "unknown" anyway.
                 story = UserStory.Create(Guid.NewGuid().ToString(), team.Id, row.Title!, row.Description,
-                    createdByUserId: requestingUserId, jiraIssueKey: row.JiraIssueKey, azureDevOpsWorkItemId: row.AzureDevOpsWorkItemId);
+                    createdByUserId: requestingUserId, jiraIssueKey: row.JiraIssueKey, azureDevOpsWorkItemId: row.AzureDevOpsWorkItemId,
+                    gitHubIssueKey: row.GitHubIssueKey);
             }
 
             if (row.DueDate.HasValue) story.SetDueDate(row.DueDate);
@@ -112,8 +125,9 @@ internal static class UserStoryRowApplier
 
             if (row.JiraIssueKey is not null) storyIdByJiraKey[row.JiraIssueKey] = story.Id;
             if (row.AzureDevOpsWorkItemId is not null) storyIdByWorkItemId[row.AzureDevOpsWorkItemId] = story.Id;
+            if (row.GitHubIssueKey is not null) storyIdByGitHubKey[row.GitHubIssueKey] = story.Id;
         }
 
-        return new ApplyResult(createdCount, updatedCount, storyIdByJiraKey, storyIdByWorkItemId);
+        return new ApplyResult(createdCount, updatedCount, storyIdByJiraKey, storyIdByWorkItemId, storyIdByGitHubKey);
     }
 }

@@ -47,6 +47,7 @@ internal static class ImportRowParser
         var assigneeEmailIndex = IndexFor(mapping.AssigneeEmailColumn);
         var jiraIssueKeyIndex = IndexFor(mapping.JiraIssueKeyColumn);
         var azureDevOpsWorkItemIdIndex = IndexFor(mapping.AzureDevOpsWorkItemIdColumn);
+        var gitHubIssueKeyIndex = IndexFor(mapping.GitHubIssueKeyColumn);
 
         // Skip the header row.
         for (var i = 1; i < rows.Count; i++)
@@ -79,6 +80,7 @@ internal static class ImportRowParser
             var assigneeEmail = Col(assigneeEmailIndex);
             var jiraIssueKey = Col(jiraIssueKeyIndex);
             var azureDevOpsWorkItemId = Col(azureDevOpsWorkItemIdIndex);
+            var gitHubIssueKey = Col(gitHubIssueKeyIndex);
 
             // A source's assignee name (CSV exports) can't be reliably matched
             // to one of our accounts, so that path stays unassigned — but a
@@ -87,7 +89,8 @@ internal static class ImportRowParser
             results.Add(new ImportRowDto(rowNumber, true, null, title, string.IsNullOrWhiteSpace(description) ? null : description,
                 status, priority, string.IsNullOrWhiteSpace(assigneeEmail) ? null : assigneeEmail, dueDate, storyPoints, labelNames,
                 string.IsNullOrWhiteSpace(jiraIssueKey) ? null : jiraIssueKey,
-                string.IsNullOrWhiteSpace(azureDevOpsWorkItemId) ? null : azureDevOpsWorkItemId));
+                string.IsNullOrWhiteSpace(azureDevOpsWorkItemId) ? null : azureDevOpsWorkItemId,
+                string.IsNullOrWhiteSpace(gitHubIssueKey) ? null : gitHubIssueKey));
         }
 
         return results;

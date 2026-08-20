@@ -59,7 +59,14 @@ public class ApiFactory : WebApplicationFactory<Program>
             config.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["MongoDb:ConnectionString"] = _mongoConnectionString,
-                ["MongoDb:DatabaseName"] = $"{_databaseNamePrefix}_{Guid.NewGuid():N}",
+                // MongoDB caps database names at 63 bytes — a full 32-char
+                // GUID ("N" format) plus a descriptive prefix like
+                // "todoapp_security_regression_tests" blew past that (66
+                // chars, a real CI failure). 8 hex chars (4+ billion
+                // combinations) is still effectively collision-proof for the
+                // handful of factories any one test run creates, and leaves
+                // any prefix up to ~54 characters of headroom.
+                ["MongoDb:DatabaseName"] = $"{_databaseNamePrefix}_{Guid.NewGuid().ToString("N")[..8]}",
                 ["Jwt:SecretKey"] = "integration-test-secret-key-at-least-32-chars-long",
                 ["Jwt:Issuer"] = "TodoApp",
                 ["Jwt:Audience"] = "TodoAppClient",

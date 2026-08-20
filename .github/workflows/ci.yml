@@ -55,7 +55,13 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          # jsdom (a devDependency, via vitest) requires Node ^22.22.2 ||
+          # ^24.15.0 || >=26.0.0 as of its current version — Node 20 doesn't
+          # satisfy that and fails at test time with a cryptic
+          # "webidl.util.markAsUncloneable is not a function" from undici,
+          # not an obviously Node-version-related error. '22' resolves to
+          # the latest 22.x release, comfortably inside jsdom's supported range.
+          node-version: '22'
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
 

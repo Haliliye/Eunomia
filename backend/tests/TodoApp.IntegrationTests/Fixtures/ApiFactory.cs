@@ -20,6 +20,30 @@ public class ApiFactory : WebApplicationFactory<Program>
     private readonly string _databaseNamePrefix;
     private readonly string _attachmentStorageRoot = Path.Combine(Path.GetTempPath(), $"todoapp-attachments-test-{Guid.NewGuid():N}");
 
+    static ApiFactory()
+    {
+        // Belt-and-suspenders alongside the ConfigureAppConfiguration override
+        // below: WebApplicationBuilder's default configuration sources
+        // (including environment variables, using the "Section__Key" double-
+        // underscore convention) are loaded synchronously as part of
+        // WebApplication.CreateBuilder() itself — before Program.cs's own
+        // top-level statements run any further code. ConfigureAppConfiguration
+        // overrides added via WebApplicationFactory.ConfigureWebHost, by
+        // contrast, aren't guaranteed to be visible in time for Program.cs
+        // code that reads builder.Configuration synchronously before
+        // builder.Build() (the Jwt:SecretKey validation is exactly that kind
+        // of early, synchronous read). Setting these as process environment
+        // variables sidesteps that timing question entirely. Fine to set
+        // process-wide (not per-instance) since every test wants the same
+        // valid secret anyway — unlike the Mongo database name below, which
+        // does need to be unique per factory instance.
+        Environment.SetEnvironmentVariable("Jwt__SecretKey", "integration-test-secret-key-at-least-32-chars-long");
+        Environment.SetEnvironmentVariable("Jwt__Issuer", "TodoApp");
+        Environment.SetEnvironmentVariable("Jwt__Audience", "TodoAppClient");
+        Environment.SetEnvironmentVariable("Jwt__ExpiryMinutes", "15");
+        Environment.SetEnvironmentVariable("Jwt__RefreshTokenExpiryDays", "30");
+    }
+
     public ApiFactory(string mongoConnectionString, string databaseNamePrefix = "todoapp_api_tests")
     {
         _mongoConnectionString = mongoConnectionString;

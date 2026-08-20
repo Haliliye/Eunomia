@@ -1,6 +1,9 @@
 {
   "name": "todo-app-frontend",
   "private": true,
+  "engines": {
+    "node": ">=22.22.2"
+  },
   "version": "0.1.0",
   "type": "module",
   "scripts": {

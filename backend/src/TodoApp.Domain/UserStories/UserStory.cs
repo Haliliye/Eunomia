@@ -103,6 +103,9 @@ public class UserStory : AggregateRoot
     /// <summary>Same idea as JiraIssueKey but for GitHub — "{owner}/{repo}#{number}" (e.g. "octocat/hello-world#42") this story was imported from. The full owner/repo is included, not just the number, since a team could import from more than one repo.</summary>
     public string? GitHubIssueKey { get; private set; }
 
+    /// <summary>Same idea as GitHubIssueKey but for GitLab — "{namespace/project}#{iid}" (e.g. "my-group/my-project#7") this story was imported from.</summary>
+    public string? GitLabIssueKey { get; private set; }
+
     /// <summary>
     /// References another UserStory's Id — that story is this one's Epic.
     /// Unlike ParentId (subtasks), an epic link never hides a story from the
@@ -124,7 +127,7 @@ public class UserStory : AggregateRoot
         CreatedOn = DateTime.UtcNow;
     }
 
-    public static UserStory Create(string id, string teamId, string title, string? description, string? createdByUserId = null, string? parentId = null, string? jiraIssueKey = null, string? azureDevOpsWorkItemId = null, string? gitHubIssueKey = null)
+    public static UserStory Create(string id, string teamId, string title, string? description, string? createdByUserId = null, string? parentId = null, string? jiraIssueKey = null, string? azureDevOpsWorkItemId = null, string? gitHubIssueKey = null, string? gitLabIssueKey = null)
     {
         if (string.IsNullOrWhiteSpace(title))
             throw new ArgumentException("Title is required.", nameof(title));
@@ -135,7 +138,8 @@ public class UserStory : AggregateRoot
             ParentId = parentId,
             JiraIssueKey = jiraIssueKey,
             AzureDevOpsWorkItemId = azureDevOpsWorkItemId,
-            GitHubIssueKey = gitHubIssueKey
+            GitHubIssueKey = gitHubIssueKey,
+            GitLabIssueKey = gitLabIssueKey
         };
     }
 
@@ -173,7 +177,8 @@ public class UserStory : AggregateRoot
         string? jiraIssueKey = null,
         string? epicId = null,
         string? azureDevOpsWorkItemId = null,
-        string? gitHubIssueKey = null)
+        string? gitHubIssueKey = null,
+        string? gitLabIssueKey = null)
     {
         var story = new UserStory(id, teamId, title, description)
         {
@@ -195,7 +200,8 @@ public class UserStory : AggregateRoot
             JiraIssueKey = jiraIssueKey,
             EpicId = epicId,
             AzureDevOpsWorkItemId = azureDevOpsWorkItemId,
-            GitHubIssueKey = gitHubIssueKey
+            GitHubIssueKey = gitHubIssueKey,
+            GitLabIssueKey = gitLabIssueKey
         };
 
         if (links is not null)

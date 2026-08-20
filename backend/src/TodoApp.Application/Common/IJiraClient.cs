@@ -10,6 +10,9 @@ namespace TodoApp.Application.Common;
 /// </summary>
 public interface IJiraClient
 {
+    /// <summary>False when Jira:ClientId/ClientSecret aren't set — lets callers give a clear "not configured" error instead of building a broken OAuth URL.</summary>
+    bool IsConfigured { get; }
+
     /// <summary>Builds the full authorize.atlassian.com URL the user's browser is redirected to. State is an opaque, caller-generated anti-CSRF value round-tripped back to the callback.</summary>
     string BuildAuthorizationUrl(string state);
 

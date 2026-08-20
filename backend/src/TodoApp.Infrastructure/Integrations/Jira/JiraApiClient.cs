@@ -60,6 +60,8 @@ public class JiraApiClient : IJiraClient
         _settings = settings.Value;
     }
 
+    public bool IsConfigured => _settings.IsConfigured;
+
     public string BuildAuthorizationUrl(string state)
     {
         var query = new Dictionary<string, string>

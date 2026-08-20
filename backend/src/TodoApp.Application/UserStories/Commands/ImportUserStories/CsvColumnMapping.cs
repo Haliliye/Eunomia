@@ -30,4 +30,5 @@ public record CsvColumnMapping(
     // key in an arbitrary export, so every CSV row always creates a new story.
     string? JiraIssueKeyColumn = null,
     string? AzureDevOpsWorkItemIdColumn = null,
-    string? GitHubIssueKeyColumn = null);
+    string? GitHubIssueKeyColumn = null,
+    string? GitLabIssueKeyColumn = null);

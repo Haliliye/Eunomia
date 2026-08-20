@@ -21,6 +21,8 @@ public static class DependencyInjection
         services.AddScoped<Integrations.AzureDevOps.AzureDevOpsProjectImportService>();
         services.AddScoped<Integrations.GitHub.GitHubAccessTokenProvider>();
         services.AddScoped<Integrations.GitHub.GitHubProjectImportService>();
+        services.AddScoped<Integrations.GitLab.GitLabAccessTokenProvider>();
+        services.AddScoped<Integrations.GitLab.GitLabProjectImportService>();
 
         return services;
     }

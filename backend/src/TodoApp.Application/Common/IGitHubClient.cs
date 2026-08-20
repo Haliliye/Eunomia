@@ -12,6 +12,9 @@ namespace TodoApp.Application.Common;
 /// </summary>
 public interface IGitHubClient
 {
+    /// <summary>False when GitHub:ClientId/ClientSecret aren't set — lets callers give a clear "not configured" error instead of building a broken OAuth URL.</summary>
+    bool IsConfigured { get; }
+
     string BuildAuthorizationUrl(string state);
 
     Task<GitHubTokenResult> ExchangeCodeForTokenAsync(string code, CancellationToken cancellationToken = default);

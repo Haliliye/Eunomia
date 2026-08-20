@@ -17,6 +17,7 @@ using TodoApp.Infrastructure.Email;
 using TodoApp.Infrastructure.Integrations.Jira;
 using TodoApp.Infrastructure.Integrations.AzureDevOps;
 using TodoApp.Infrastructure.Integrations.GitHub;
+using TodoApp.Infrastructure.Integrations.GitLab;
 using TodoApp.Infrastructure.Persistence;
 using TodoApp.Infrastructure.Persistence.Repositories;
 using TodoApp.Infrastructure.Security;
@@ -35,6 +36,7 @@ public static class DependencyInjection
         services.Configure<R2StorageSettings>(configuration.GetSection(R2StorageSettings.SectionName));
         services.Configure<JiraSettings>(configuration.GetSection(JiraSettings.SectionName));
         services.Configure<GitHubSettings>(configuration.GetSection(GitHubSettings.SectionName));
+        services.Configure<GitLabSettings>(configuration.GetSection(GitLabSettings.SectionName));
         services.Configure<TokenEncryptionSettings>(configuration.GetSection(TokenEncryptionSettings.SectionName));
         services.AddSingleton<MongoDbContext>();
 
@@ -52,6 +54,7 @@ public static class DependencyInjection
         services.AddScoped<IPersonalTaskRepository, PersonalTaskRepository>();
         services.AddScoped<IJiraConnectionRepository, JiraConnectionRepository>();
         services.AddScoped<IGitHubConnectionRepository, GitHubConnectionRepository>();
+        services.AddScoped<IGitLabConnectionRepository, GitLabConnectionRepository>();
         services.AddScoped<IAzureDevOpsConnectionRepository, AzureDevOpsConnectionRepository>();
         services.AddScoped<IAzureDevOpsProjectSyncRepository, AzureDevOpsProjectSyncRepository>();
         services.AddScoped<IEmailSignupInvitationRepository, EmailSignupInvitationRepository>();
@@ -100,22 +103,23 @@ public static class DependencyInjection
 
         services.AddSingleton<ITokenCipher, AesTokenCipher>();
 
-        // Only registered when a Jira OAuth app is actually configured — the
-        // Jira endpoints simply aren't usable (clear DI error rather than a
-        // silent no-op) until Jira:ClientId/ClientSecret are set, same as
-        // Brevo above.
-        var jiraSettings = configuration.GetSection(JiraSettings.SectionName).Get<JiraSettings>();
-        if (jiraSettings?.IsConfigured == true)
-        {
-            services.AddHttpClient<IJiraClient, JiraApiClient>();
-        }
-
-        // Same gating reasoning as Jira above — only usable once GitHub:ClientId/ClientSecret are set.
-        var gitHubSettings = configuration.GetSection(GitHubSettings.SectionName).Get<GitHubSettings>();
-        if (gitHubSettings?.IsConfigured == true)
-        {
-            services.AddHttpClient<IGitHubClient, GitHubApiClient>();
-        }
+        // Registered unconditionally (regardless of whether Jira/GitHub/GitLab
+        // are actually configured) — MediatR auto-registers every handler in
+        // these integrations' Commands/Queries folders regardless of config
+        // state, and those handlers take IJiraClient/IGitHubClient/IGitLabClient
+        // as constructor dependencies. Gating the client registration itself
+        // on IsConfigured (as this used to do) meant the DI container had a
+        // handler needing a service that was never registered — .NET's
+        // startup-time container validation (on by default in Development,
+        // which is what WebApplicationFactory-based tests run under) then
+        // fails to build the ENTIRE app, not just the unconfigured
+        // integration's endpoints. Registering unconditionally like
+        // AzureDevOps already does below fixes that; each integration's
+        // Start*ConnectionCommandHandler is where "not configured" should be
+        // surfaced instead, as a normal per-request error.
+        services.AddHttpClient<IJiraClient, JiraApiClient>();
+        services.AddHttpClient<IGitHubClient, GitHubApiClient>();
+        services.AddHttpClient<IGitLabClient, GitLabApiClient>();
 
         // PAT-based (see AzureDevOpsConnection) — no client id/secret to gate
         // registration on, unlike Jira's OAuth client.

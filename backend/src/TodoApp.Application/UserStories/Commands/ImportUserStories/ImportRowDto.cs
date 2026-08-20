@@ -16,6 +16,7 @@ public record ImportRowDto(
     IReadOnlyList<string> LabelNames,
     string? JiraIssueKey = null,
     string? AzureDevOpsWorkItemId = null,
-    string? GitHubIssueKey = null);
+    string? GitHubIssueKey = null,
+    string? GitLabIssueKey = null);
 
 public record ImportSummaryDto(int CreatedCount, int SkippedCount, IReadOnlyList<ImportRowDto> Rows, int UpdatedCount = 0);

@@ -35,6 +35,7 @@ public class MongoDbContext
     public IMongoCollection<PersonalTaskDocument> PersonalTasks => _database.GetCollection<PersonalTaskDocument>("personalTasks");
     public IMongoCollection<JiraConnectionDocument> JiraConnections => _database.GetCollection<JiraConnectionDocument>("jiraConnections");
     public IMongoCollection<GitHubConnectionDocument> GitHubConnections => _database.GetCollection<GitHubConnectionDocument>("gitHubConnections");
+    public IMongoCollection<GitLabConnectionDocument> GitLabConnections => _database.GetCollection<GitLabConnectionDocument>("gitLabConnections");
     public IMongoCollection<EmailSignupInvitationDocument> EmailSignupInvitations => _database.GetCollection<EmailSignupInvitationDocument>("emailSignupInvitations");
     public IMongoCollection<JiraProjectSyncDocument> JiraProjectSyncs => _database.GetCollection<JiraProjectSyncDocument>("jiraProjectSyncs");
     public IMongoCollection<BoardDocument> Boards => _database.GetCollection<BoardDocument>("boards");

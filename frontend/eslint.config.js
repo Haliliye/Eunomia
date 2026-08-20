@@ -19,15 +19,17 @@ export default tseslint.config(
     },
     rules: {
       ...reactHooks.configs.recommended.rules,
-      // These three are React Compiler-readiness lints (aimed at code that
+      // These four are React Compiler-readiness lints (aimed at code that
       // will run through the compiler) rather than bug detectors — they
       // flag conventional, working patterns used throughout this codebase
-      // (setLoading(true) at the top of a data-fetching effect, etc.).
+      // (setLoading(true) at the top of a data-fetching effect, calling
+      // Date.now() in render for an "is this overdue" comparison, etc.).
       // Downgraded to warnings so `lint` surfaces them without blocking on
       // patterns that aren't actually broken.
       'react-hooks/set-state-in-effect': 'warn',
       'react-hooks/static-components': 'warn',
       'react-hooks/refs': 'warn',
+      'react-hooks/purity': 'warn',
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
       // The codebase leans on `any` deliberately in a handful of spots
       // (mostly axios error narrowing: `catch (err: any)`) — downgraded to a

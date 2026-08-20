@@ -32,6 +32,8 @@ public class GitHubApiClient : IGitHubClient
         _logger = logger;
     }
 
+    public bool IsConfigured => _settings.IsConfigured;
+
     public string BuildAuthorizationUrl(string state)
     {
         var query = new Dictionary<string, string>

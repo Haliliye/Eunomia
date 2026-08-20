@@ -61,4 +61,6 @@ public interface IUserStoryRepository
     Task<IReadOnlyList<UserStory>> GetByAzureDevOpsWorkItemIdsAsync(string teamId, IEnumerable<string> workItemIds, CancellationToken cancellationToken = default);
     /// <summary>Same idea as GetByAzureDevOpsWorkItemIdsAsync but for GitHub issue keys ("{owner}/{repo}#{number}").</summary>
     Task<IReadOnlyList<UserStory>> GetByGitHubIssueKeysAsync(string teamId, IEnumerable<string> gitHubIssueKeys, CancellationToken cancellationToken = default);
+    /// <summary>Same idea but for GitLab issue keys ("{namespace/project}#{iid}").</summary>
+    Task<IReadOnlyList<UserStory>> GetByGitLabIssueKeysAsync(string teamId, IEnumerable<string> gitLabIssueKeys, CancellationToken cancellationToken = default);
 }

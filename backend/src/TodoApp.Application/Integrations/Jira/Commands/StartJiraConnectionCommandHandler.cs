@@ -17,6 +17,13 @@ public class StartJiraConnectionCommandHandler : IRequestHandler<StartJiraConnec
 
     public Task<string> Handle(StartJiraConnectionCommand request, CancellationToken cancellationToken)
     {
+        // IJiraClient is registered in DI unconditionally now (see
+        // DependencyInjection.cs for why), so this is the actual "Jira isn't
+        // set up on this server" check — surfaced as a normal per-request
+        // error here instead of crashing the whole app at startup.
+        if (!_jiraClient.IsConfigured)
+            throw new InvalidOperationException("Jira integration isn't configured on this server yet.");
+
         // The OAuth "state" round-trips through Atlassian and the user's
         // browser untouched, so it's the only way to carry our own context
         // (which user started this) into the callback below — the callback

@@ -6,6 +6,7 @@ import CreateTeamModal from '@/components/teams/CreateTeamModal'
 import CreateTeamFromJiraModal from '@/components/teams/CreateTeamFromJiraModal'
 import CreateTeamFromAzureDevOpsModal from '@/components/teams/CreateTeamFromAzureDevOpsModal'
 import CreateTeamFromGitHubModal from '@/components/teams/CreateTeamFromGitHubModal'
+import CreateTeamFromGitLabModal from '@/components/teams/CreateTeamFromGitLabModal'
 import PendingInvitations from '@/components/teams/PendingInvitations'
 import ConfirmDeleteModal from '@/components/common/ConfirmDeleteModal'
 import { SkeletonTeamGrid } from '@/components/common/Skeleton'
@@ -25,6 +26,7 @@ export default function TeamsPage() {
   const [isJiraModalOpen, setJiraModalOpen] = useState(false)
   const [isAzureDevOpsModalOpen, setAzureDevOpsModalOpen] = useState(false)
   const [isGitHubModalOpen, setGitHubModalOpen] = useState(false)
+  const [isGitLabModalOpen, setGitLabModalOpen] = useState(false)
   const [isLoading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [deletingTeam, setDeletingTeam] = useState<Team | null>(null)
@@ -78,6 +80,7 @@ export default function TeamsPage() {
           <button className="btn" onClick={() => setJiraModalOpen(true)}>Import from Jira</button>
           <button className="btn" onClick={() => setAzureDevOpsModalOpen(true)}>Import from Azure DevOps</button>
           <button className="btn" onClick={() => setGitHubModalOpen(true)}>Import from GitHub</button>
+          <button className="btn" onClick={() => setGitLabModalOpen(true)}>Import from GitLab</button>
           <button className="btn btn-primary" onClick={() => setModalOpen(true)}>+ New Team</button>
         </div>
       </div>
@@ -102,6 +105,7 @@ export default function TeamsPage() {
       {isJiraModalOpen && <CreateTeamFromJiraModal onClose={() => setJiraModalOpen(false)} />}
       {isAzureDevOpsModalOpen && <CreateTeamFromAzureDevOpsModal onClose={() => setAzureDevOpsModalOpen(false)} />}
       {isGitHubModalOpen && <CreateTeamFromGitHubModal onClose={() => setGitHubModalOpen(false)} />}
+      {isGitLabModalOpen && <CreateTeamFromGitLabModal onClose={() => setGitLabModalOpen(false)} />}
       <ConfirmDeleteModal
         isOpen={deletingTeam !== null}
         title="Delete team"

@@ -37,6 +37,7 @@ public class UserStoryDocument
     public string? EpicId { get; set; }
     public string? AzureDevOpsWorkItemId { get; set; }
     public string? GitHubIssueKey { get; set; }
+    public string? GitLabIssueKey { get; set; }
 }
 
 public class StoryLinkDocument

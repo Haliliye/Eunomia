@@ -11,19 +11,22 @@ internal record ApplyResult(
     int UpdatedCount,
     IReadOnlyDictionary<string, string> StoryIdByJiraKey,
     IReadOnlyDictionary<string, string> StoryIdByAzureDevOpsWorkItemId,
-    IReadOnlyDictionary<string, string> StoryIdByGitHubIssueKey);
+    IReadOnlyDictionary<string, string> StoryIdByGitHubIssueKey,
+    IReadOnlyDictionary<string, string> StoryIdByGitLabIssueKey);
 
 /// <summary>
 /// Turns already-parsed+validated ImportRowDtos into real UserStory
 /// aggregates on a team. Shared by ImportUserStoriesCommandHandler (CSV),
-/// JiraProjectImportService, AzureDevOpsProjectImportService, and
-/// GitHubProjectImportService — the sources differ only in how they produce
-/// ImportRowDtos, not in what happens once you have them.
+/// JiraProjectImportService, AzureDevOpsProjectImportService,
+/// GitHubProjectImportService, and GitLabProjectImportService — the
+/// sources differ only in how they produce ImportRowDtos, not in what
+/// happens once you have them.
 ///
-/// Rows carrying a JiraIssueKey, AzureDevOpsWorkItemId, or GitHubIssueKey are
-/// matched against existing stories with that same key/id on this team and
-/// updated in place instead of creating a duplicate — this is what makes
-/// re-importing the same project safe to run repeatedly.
+/// Rows carrying a JiraIssueKey, AzureDevOpsWorkItemId, GitHubIssueKey, or
+/// GitLabIssueKey are matched against existing stories with that same
+/// key/id on this team and updated in place instead of creating a
+/// duplicate — this is what makes re-importing the same project safe to
+/// run repeatedly.
 /// </summary>
 internal static class UserStoryRowApplier
 {
@@ -52,11 +55,17 @@ internal static class UserStoryRowApplier
             .Where(s => s.GitHubIssueKey is not null)
             .ToDictionary(s => s.GitHubIssueKey!, s => s);
 
+        var gitLabKeys = rows.Where(r => r.IsValid && r.GitLabIssueKey is not null).Select(r => r.GitLabIssueKey!).Distinct().ToList();
+        var existingByGitLabKey = (await userStoryRepository.GetByGitLabIssueKeysAsync(team.Id, gitLabKeys, cancellationToken))
+            .Where(s => s.GitLabIssueKey is not null)
+            .ToDictionary(s => s.GitLabIssueKey!, s => s);
+
         var createdCount = 0;
         var updatedCount = 0;
         var storyIdByJiraKey = new Dictionary<string, string>();
         var storyIdByWorkItemId = new Dictionary<string, string>();
         var storyIdByGitHubKey = new Dictionary<string, string>();
+        var storyIdByGitLabKey = new Dictionary<string, string>();
 
         foreach (var row in rows)
         {
@@ -65,6 +74,7 @@ internal static class UserStoryRowApplier
             var existing = (row.JiraIssueKey is not null && existingByJiraKey.TryGetValue(row.JiraIssueKey, out var byJira)) ? byJira
                 : (row.AzureDevOpsWorkItemId is not null && existingByWorkItemId.TryGetValue(row.AzureDevOpsWorkItemId, out var byWorkItem)) ? byWorkItem
                 : (row.GitHubIssueKey is not null && existingByGitHubKey.TryGetValue(row.GitHubIssueKey, out var byGitHub)) ? byGitHub
+                : (row.GitLabIssueKey is not null && existingByGitLabKey.TryGetValue(row.GitLabIssueKey, out var byGitLab)) ? byGitLab
                 : null;
 
             UserStory story;
@@ -81,7 +91,7 @@ internal static class UserStoryRowApplier
                 // more useful fact than "unknown" anyway.
                 story = UserStory.Create(Guid.NewGuid().ToString(), team.Id, row.Title!, row.Description,
                     createdByUserId: requestingUserId, jiraIssueKey: row.JiraIssueKey, azureDevOpsWorkItemId: row.AzureDevOpsWorkItemId,
-                    gitHubIssueKey: row.GitHubIssueKey);
+                    gitHubIssueKey: row.GitHubIssueKey, gitLabIssueKey: row.GitLabIssueKey);
             }
 
             if (row.DueDate.HasValue) story.SetDueDate(row.DueDate);
@@ -126,8 +136,9 @@ internal static class UserStoryRowApplier
             if (row.JiraIssueKey is not null) storyIdByJiraKey[row.JiraIssueKey] = story.Id;
             if (row.AzureDevOpsWorkItemId is not null) storyIdByWorkItemId[row.AzureDevOpsWorkItemId] = story.Id;
             if (row.GitHubIssueKey is not null) storyIdByGitHubKey[row.GitHubIssueKey] = story.Id;
+            if (row.GitLabIssueKey is not null) storyIdByGitLabKey[row.GitLabIssueKey] = story.Id;
         }
 
-        return new ApplyResult(createdCount, updatedCount, storyIdByJiraKey, storyIdByWorkItemId, storyIdByGitHubKey);
+        return new ApplyResult(createdCount, updatedCount, storyIdByJiraKey, storyIdByWorkItemId, storyIdByGitHubKey, storyIdByGitLabKey);
     }
 }

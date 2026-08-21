@@ -2,22 +2,18 @@ import { useEffect, useState } from 'react'
 import { gitLabApi, type GitLabStatus } from '@/api/gitlab'
 import { useToast } from '@/context/ToastContext'
 import { useConfirm } from '@/context/ConfirmContext'
-import GitLabImportModal from './GitLabImportModal'
 
+/** One row inside ConnectionsCard — importing a project now happens from the "Import a team" flow on the Teams page instead of from here, so this is connect/disconnect only. */
 export default function GitLabIntegrationCard() {
   const { showToast } = useToast()
   const confirm = useConfirm()
   const [status, setStatus] = useState<GitLabStatus | null>(null)
   const [isLoading, setLoading] = useState(true)
   const [isConnecting, setConnecting] = useState(false)
-  const [showImportModal, setShowImportModal] = useState(false)
 
   const loadStatus = () => gitLabApi.getStatus().then(setStatus).finally(() => setLoading(false))
 
   useEffect(() => {
-    // The OAuth callback redirects back here with ?gitlab=connected or
-    // ?gitlab=error&message=... — surface that as a toast once, then strip
-    // the params so a page refresh doesn't re-show it.
     const params = new URLSearchParams(window.location.search)
     const result = params.get('gitlab')
     if (result === 'connected') {
@@ -40,7 +36,7 @@ export default function GitLabIntegrationCard() {
     setConnecting(true)
     try {
       const authorizationUrl = await gitLabApi.connect()
-      window.location.href = authorizationUrl // full-page redirect — GitLab's consent screen can't run in an XHR
+      window.location.href = authorizationUrl
     } catch {
       showToast("Couldn't start the GitLab connection.", 'error')
       setConnecting(false)
@@ -60,31 +56,18 @@ export default function GitLabIntegrationCard() {
   }
 
   return (
-    <div className="card" style={{ marginTop: 20 }}>
-      <div className="card-header"><h3>GitLab</h3></div>
-      <p style={{ marginBottom: 12, fontSize: 12.5, color: 'var(--color-ink-muted)' }}>
-        Connect your GitLab account to import a project's issues straight into a team's backlog.
-      </p>
-
-      {isLoading ? (
-        <p>Loading…</p>
-      ) : status?.isConnected ? (
-        <>
-          <p style={{ marginBottom: 12 }}>
-            Connected as <strong>@{status.gitLabUsername}</strong>.
-          </p>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button className="btn btn-primary" onClick={() => setShowImportModal(true)}>Import a project…</button>
-            <button className="btn" onClick={handleDisconnect}>Disconnect</button>
-          </div>
-        </>
-      ) : (
-        <button className="btn btn-primary" onClick={handleConnect} disabled={isConnecting}>
-          {isConnecting ? 'Redirecting…' : 'Connect GitLab'}
-        </button>
+    <div className="connection-row">
+      <div>
+        <strong>GitLab</strong>
+        <p style={{ margin: '2px 0 0', fontSize: 12.5, color: 'var(--color-ink-muted)' }}>
+          {isLoading ? 'Loading…' : status?.isConnected ? <>Connected as <strong>@{status.gitLabUsername}</strong></> : 'Not connected'}
+        </p>
+      </div>
+      {!isLoading && (
+        status?.isConnected
+          ? <button className="btn" onClick={handleDisconnect}>Disconnect</button>
+          : <button className="btn btn-primary" onClick={handleConnect} disabled={isConnecting}>{isConnecting ? 'Redirecting…' : 'Connect'}</button>
       )}
-
-      {showImportModal && <GitLabImportModal onClose={() => setShowImportModal(false)} />}
     </div>
   )
 }

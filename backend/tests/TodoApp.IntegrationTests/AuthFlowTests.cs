@@ -48,7 +48,13 @@ public class AuthFlowTests : IDisposable
     {
         var count = 0;
         var index = 0;
-        while ((index = haystack.IndexOf(needle, index, StringComparison.Ordinal)) != -1)
+        // OrdinalIgnoreCase — Kestrel/TestServer render "httponly" here in
+        // lowercase (confirmed from an actual CI run's raw header text), not
+        // the conventional "HttpOnly" casing a browser or RFC example might
+        // suggest. Cookie attribute names are case-insensitive per RFC 6265
+        // anyway, so matching case-insensitively is also the semantically
+        // correct thing to do here, not just a workaround.
+        while ((index = haystack.IndexOf(needle, index, StringComparison.OrdinalIgnoreCase)) != -1)
         {
             count++;
             index += needle.Length;

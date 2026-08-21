@@ -2,15 +2,14 @@ import { useEffect, useState } from 'react'
 import { integrationsApi, type JiraStatus } from '@/api/integrations'
 import { useToast } from '@/context/ToastContext'
 import { useConfirm } from '@/context/ConfirmContext'
-import JiraImportModal from './JiraImportModal'
 
+/** One row inside ConnectionsCard — importing a project now happens from the "Import a team" flow on the Teams page instead of from here, so this is connect/disconnect only. */
 export default function JiraIntegrationCard() {
   const { showToast } = useToast()
   const confirm = useConfirm()
   const [status, setStatus] = useState<JiraStatus | null>(null)
   const [isLoading, setLoading] = useState(true)
   const [isConnecting, setConnecting] = useState(false)
-  const [showImportModal, setShowImportModal] = useState(false)
 
   const loadStatus = () => integrationsApi.getJiraStatus().then(setStatus).finally(() => setLoading(false))
 
@@ -60,31 +59,18 @@ export default function JiraIntegrationCard() {
   }
 
   return (
-    <div className="card" style={{ marginTop: 20 }}>
-      <div className="card-header"><h3>Jira</h3></div>
-      <p style={{ marginBottom: 12, fontSize: 12.5, color: 'var(--color-ink-muted)' }}>
-        Connect your Jira account to import a project's issues straight into a team's backlog.
-      </p>
-
-      {isLoading ? (
-        <p>Loading…</p>
-      ) : status?.isConnected ? (
-        <>
-          <p style={{ marginBottom: 12 }}>
-            Connected to <strong>{status.siteName}</strong>.
-          </p>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button className="btn btn-primary" onClick={() => setShowImportModal(true)}>Import a project…</button>
-            <button className="btn" onClick={handleDisconnect}>Disconnect</button>
-          </div>
-        </>
-      ) : (
-        <button className="btn btn-primary" onClick={handleConnect} disabled={isConnecting}>
-          {isConnecting ? 'Redirecting…' : 'Connect Jira'}
-        </button>
+    <div className="connection-row">
+      <div>
+        <strong>Jira</strong>
+        <p style={{ margin: '2px 0 0', fontSize: 12.5, color: 'var(--color-ink-muted)' }}>
+          {isLoading ? 'Loading…' : status?.isConnected ? <>Connected to <strong>{status.siteName}</strong></> : 'Not connected'}
+        </p>
+      </div>
+      {!isLoading && (
+        status?.isConnected
+          ? <button className="btn" onClick={handleDisconnect}>Disconnect</button>
+          : <button className="btn btn-primary" onClick={handleConnect} disabled={isConnecting}>{isConnecting ? 'Redirecting…' : 'Connect'}</button>
       )}
-
-      {showImportModal && <JiraImportModal onClose={() => setShowImportModal(false)} />}
     </div>
   )
 }

@@ -458,6 +458,19 @@ select option {
   margin-bottom: var(--space-3);
 }
 
+.connection-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.connection-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
 /* ==========================================================================
    Team grid
    ========================================================================== */

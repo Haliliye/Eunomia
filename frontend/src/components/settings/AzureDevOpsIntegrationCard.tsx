@@ -2,15 +2,21 @@ import { useEffect, useState } from 'react'
 import { azureDevOpsApi, type AzureDevOpsStatus } from '@/api/azureDevOps'
 import { useToast } from '@/context/ToastContext'
 import { useConfirm } from '@/context/ConfirmContext'
-import AzureDevOpsImportModal from './AzureDevOpsImportModal'
 
+/**
+ * One row inside ConnectionsCard. Unlike the other three (OAuth redirect),
+ * Azure DevOps connects via a pasted Personal Access Token — this row
+ * expands in place to show that form instead of redirecting anywhere.
+ * Importing a project now happens from the "Import a team" flow on the
+ * Teams page instead of from here, so this is connect/disconnect only.
+ */
 export default function AzureDevOpsIntegrationCard() {
   const { showToast } = useToast()
   const confirm = useConfirm()
   const [status, setStatus] = useState<AzureDevOpsStatus | null>(null)
   const [isLoading, setLoading] = useState(true)
   const [isConnecting, setConnecting] = useState(false)
-  const [showImportModal, setShowImportModal] = useState(false)
+  const [showConnectForm, setShowConnectForm] = useState(false)
   const [organizationName, setOrganizationName] = useState('')
   const [pat, setPat] = useState('')
   const [connectError, setConnectError] = useState<string | null>(null)
@@ -28,6 +34,7 @@ export default function AzureDevOpsIntegrationCard() {
       if (result.success) {
         showToast('Azure DevOps connected.')
         setPat('')
+        setShowConnectForm(false)
         loadStatus()
       } else {
         setConnectError(result.errorMessage ?? "Couldn't connect.")
@@ -52,23 +59,23 @@ export default function AzureDevOpsIntegrationCard() {
   }
 
   return (
-    <div className="card" style={{ marginTop: 20 }}>
-      <div className="card-header"><h3>Azure DevOps</h3></div>
-
-      {isLoading ? (
-        <p>Loading…</p>
-      ) : status?.isConnected ? (
-        <>
-          <p style={{ marginBottom: 12 }}>
-            Connected to <strong>{status.organizationName}</strong>.
+    <div className="connection-row" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <strong>Azure DevOps</strong>
+          <p style={{ margin: '2px 0 0', fontSize: 12.5, color: 'var(--color-ink-muted)' }}>
+            {isLoading ? 'Loading…' : status?.isConnected ? <>Connected to <strong>{status.organizationName}</strong></> : 'Not connected'}
           </p>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button className="btn btn-primary" onClick={() => setShowImportModal(true)}>Import a project…</button>
-            <button className="btn" onClick={handleDisconnect}>Disconnect</button>
-          </div>
-        </>
-      ) : (
-        <>
+        </div>
+        {!isLoading && (
+          status?.isConnected
+            ? <button className="btn" onClick={handleDisconnect}>Disconnect</button>
+            : <button className="btn btn-primary" onClick={() => setShowConnectForm((v) => !v)}>{showConnectForm ? 'Cancel' : 'Connect'}</button>
+        )}
+      </div>
+
+      {showConnectForm && !status?.isConnected && (
+        <div style={{ marginTop: 12 }}>
           <p style={{ marginBottom: 12, fontSize: 12.5, color: 'var(--color-ink-muted)' }}>
             Connect with a Personal Access Token — go to your Azure DevOps organization, click your
             profile picture → <strong>Personal access tokens</strong> → <strong>+ New Token</strong>, and grant
@@ -99,10 +106,8 @@ export default function AzureDevOpsIntegrationCard() {
           <button className="btn btn-primary" onClick={handleConnect} disabled={isConnecting || !organizationName.trim() || !pat.trim()} style={{ marginTop: 8 }}>
             {isConnecting ? 'Connecting…' : 'Connect Azure DevOps'}
           </button>
-        </>
+        </div>
       )}
-
-      {showImportModal && <AzureDevOpsImportModal onClose={() => setShowImportModal(false)} />}
     </div>
   )
 }
